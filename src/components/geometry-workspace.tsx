@@ -14,6 +14,7 @@ import {
   type GridLine,
 } from "../lib/geometry";
 import { useProjects } from "./project-provider";
+import { GeometryViewer } from "./geometry-viewer";
 
 type EditorTab = "grid" | "story";
 type GridMode = "spacing" | "ordinate";
@@ -164,9 +165,7 @@ function GeometryEditor({ initial, markUnsaved, saveGeometry, saveStatus }: {
         <button className="button button-primary save-geometry" type="button" disabled={Boolean(issues.length) || saveStatus === "saving"} onClick={() => void saveNow()}>Simpan Geometri</button>
       </section>
 
-      <section className="panel viewer-panel" aria-label="Viewer geometri">
-        <div className="viewer-empty"><span aria-hidden="true">⌖</span><strong>Viewer geometri</strong><p>Plan, Elevation, dan 3D akan memakai data editor ini.</p></div>
-      </section>
+      <GeometryViewer geometry={geometry} />
     </div>
   );
 }
