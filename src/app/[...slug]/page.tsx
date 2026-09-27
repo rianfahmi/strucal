@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { navigationItems } from "../../lib/navigation";
 import { ProjectData } from "../../components/project-data";
+import { GeometryWorkspace } from "../../components/geometry-workspace";
 
 type PageProps = { params: Promise<{ slug: string[] }> };
 
@@ -19,6 +20,10 @@ export default async function ModulePage({ params }: PageProps) {
 
   if (item.href === "/data-proyek") {
     return <div className="page"><header className="page-heading"><div><p className="eyebrow">Workspace proyek</p><h1>Data Proyek</h1><p className="page-description">Data tersimpan otomatis dan dapat dibuka kembali pada sesi berikutnya.</p></div></header><ProjectData /></div>;
+  }
+
+  if (item.href === "/geometri-model") {
+    return <div className="page geometry-page"><header className="page-heading"><div><p className="eyebrow">Tahap 1 · Parameter Awal</p><h1>Geometri &amp; Model</h1><p className="page-description">Susun grid dan story, lalu validasi geometri pada viewer terpadu.</p></div></header><GeometryWorkspace /></div>;
   }
 
   return (

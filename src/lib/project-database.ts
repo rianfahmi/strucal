@@ -1,7 +1,8 @@
 import type { Project, ProjectBundle, ProjectRevision } from "./projects";
+import { createDefaultGeometry, type Geometry } from "./geometry";
 
 const DATABASE_NAME = "strucal";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 
 function requestResult<T>(request: IDBRequest<T>) {
   return new Promise<T>((resolve, reject) => {
@@ -23,9 +24,12 @@ function openDatabase() {
     const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
     request.onupgradeneeded = () => {
       const database = request.result;
-      database.createObjectStore("projects", { keyPath: "id" });
-      const revisions = database.createObjectStore("project_revisions", { keyPath: "id" });
-      revisions.createIndex("project_id", "project_id");
+      if (!database.objectStoreNames.contains("projects")) database.createObjectStore("projects", { keyPath: "id" });
+      if (!database.objectStoreNames.contains("project_revisions")) {
+        const revisions = database.createObjectStore("project_revisions", { keyPath: "id" });
+        revisions.createIndex("project_id", "project_id");
+      }
+      if (!database.objectStoreNames.contains("geometries")) database.createObjectStore("geometries", { keyPath: "revision_id" });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("Database proyek tidak dapat dibuka."));
@@ -47,16 +51,17 @@ export async function listProjects() {
 export async function getProjectBundle(projectId: string): Promise<ProjectBundle | null> {
   const database = await openDatabase();
   try {
-    const transaction = database.transaction(["projects", "project_revisions"], "readonly");
+    const transaction = database.transaction(["projects", "project_revisions", "geometries"], "readonly");
     const project = await requestResult(transaction.objectStore("projects").get(projectId) as IDBRequest<Project | undefined>);
     if (!project) {
       await transactionDone(transaction);
       return null;
     }
     const revision = await requestResult(transaction.objectStore("project_revisions").get(project.active_revision_id) as IDBRequest<ProjectRevision | undefined>);
+    const geometry = await requestResult(transaction.objectStore("geometries").get(project.active_revision_id) as IDBRequest<Geometry | undefined>);
     await transactionDone(transaction);
     if (!revision) throw new Error("Revisi aktif proyek tidak ditemukan.");
-    return { project, revision };
+    return { project, revision, geometry: geometry ?? createDefaultGeometry(revision.id) };
   } finally {
     database.close();
   }
@@ -65,8 +70,9 @@ export async function getProjectBundle(projectId: string): Promise<ProjectBundle
 export async function persistProjectBundle(bundle: ProjectBundle) {
   const database = await openDatabase();
   try {
-    const transaction = database.transaction(["projects", "project_revisions"], "readwrite");
+    const transaction = database.transaction(["projects", "project_revisions", "geometries"], "readwrite");
     transaction.objectStore("project_revisions").add(bundle.revision);
+    transaction.objectStore("geometries").put(bundle.geometry);
     transaction.objectStore("projects").put(bundle.project);
     await transactionDone(transaction);
   } finally {

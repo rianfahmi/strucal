@@ -2,7 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getProjectBundle, listProjects, persistProjectBundle } from "../lib/project-database";
-import { createProjectBundle, reviseProject, sameProjectInput, type Project, type ProjectBundle, type ProjectInput } from "../lib/projects";
+import { createProjectBundle, reviseGeometry, reviseProject, sameProjectInput, type Project, type ProjectBundle, type ProjectInput } from "../lib/projects";
+import { sameGeometry, type Geometry } from "../lib/geometry";
 
 export type SaveStatus = "loading" | "saved" | "saving" | "unsaved" | "error";
 type ProjectContextValue = {
@@ -12,6 +13,7 @@ type ProjectContextValue = {
   createProject: () => Promise<void>;
   selectProject: (id: string) => Promise<void>;
   saveProject: (input: ProjectInput, reason: "manual" | "autosave") => Promise<void>;
+  saveGeometry: (geometry: Geometry, reason: "manual" | "autosave") => Promise<void>;
   markUnsaved: () => void;
 };
 
@@ -95,7 +97,29 @@ export function ProjectProvider({ children }: Readonly<{ children: React.ReactNo
     await queue.current;
   }, [applyActive]);
 
-  return <ProjectContext.Provider value={{ projects, active, saveStatus, createProject, selectProject, saveProject, markUnsaved: () => setSaveStatus("unsaved") }}>{children}</ProjectContext.Provider>;
+  const saveGeometry = useCallback(async (geometry: Geometry, reason: "manual" | "autosave") => {
+    queue.current = queue.current.then(async () => {
+      const current = activeRef.current;
+      if (!current || sameGeometry(current.geometry, geometry)) {
+        setSaveStatus("saved");
+        return;
+      }
+      setSaveStatus("saving");
+      try {
+        const next = reviseGeometry(current, geometry, reason);
+        await persistProjectBundle(next);
+        applyActive(next);
+        setProjects((items) => [next.project, ...items.filter(({ id }) => id !== next.project.id)]);
+        setSaveStatus("saved");
+      } catch (error) {
+        console.error("Gagal menyimpan geometri", error);
+        setSaveStatus("error");
+      }
+    });
+    await queue.current;
+  }, [applyActive]);
+
+  return <ProjectContext.Provider value={{ projects, active, saveStatus, createProject, selectProject, saveProject, saveGeometry, markUnsaved: () => setSaveStatus("unsaved") }}>{children}</ProjectContext.Provider>;
 }
 
 export function useProjects() {
