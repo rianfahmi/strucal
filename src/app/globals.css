@@ -9,7 +9,7 @@
 * { box-sizing: border-box; }
 html { min-width: 320px; }
 body { margin: 0; background: #f4f6f8; }
-button, select { font: inherit; }
+button, select, input { font: inherit; }
 a { color: inherit; text-decoration: none; }
 h1, h2, p { margin: 0; }
 
@@ -44,6 +44,8 @@ h1, h2, p { margin: 0; }
 .sidebar-footer { display: flex; align-items: center; gap: .55rem; min-height: 3.25rem; padding: .75rem 1.4rem; border-top: 1px solid #ffffff14; color: #9eb4af; font-size: .75rem; }
 .status-dot { width: .45rem; height: .45rem; border-radius: 50%; background: #5dbb91; }
 .status-dot-muted { background: #9aa6a3; }
+.save-state-unsaved .status-dot, .save-state-saving .status-dot { background: #d6a84b; }
+.save-state-error .status-dot { background: #b84242; }
 
 .workspace { min-height: 100vh; margin-left: 17.5rem; }
 .topbar { position: sticky; top: 0; z-index: 20; display: flex; min-height: 4.75rem; align-items: center; justify-content: space-between; gap: 1rem; padding: .7rem 2rem; border-bottom: 1px solid #dfe4e7; background: #ffffffed; backdrop-filter: blur(10px); }
@@ -62,6 +64,8 @@ h1, h2, p { margin: 0; }
 .validation-button { display: flex; align-items: center; gap: .45rem; min-height: 2.2rem; padding: .35rem .7rem; border-radius: .4rem; font-size: .76rem; font-weight: 650; }
 .validation-button > span:first-child { display: grid; width: 1.05rem; height: 1.05rem; place-items: center; border-radius: 50%; background: #fff3d9; color: #875d0c; font-size: .7rem; }
 .menu-button { display: none; width: 2.3rem; height: 2.3rem; place-items: center; border-radius: .4rem; font-size: 1.15rem; }
+.new-project-button { border: 0; background: transparent; color: #1c594b; cursor: pointer; font-size: .72rem; font-weight: 750; white-space: nowrap; }
+.new-project-button:disabled { color: #98a39f; cursor: default; }
 
 .main-content { width: 100%; padding: 2rem; }
 .page { width: min(76rem, 100%); margin: 0 auto; }
@@ -113,6 +117,14 @@ h1, h2, p { margin: 0; }
 .module-placeholder h2 { font-size: 1.05rem; }
 .module-placeholder p { margin: .45rem 0 1rem; color: #6d7a75; font-size: .82rem; }
 .sidebar-backdrop { display: none; }
+.empty-project { display: grid; justify-items: start; gap: .7rem; }
+.empty-project p { color: #69766f; font-size: .82rem; }
+.project-form-panel { display: grid; gap: 1.2rem; }
+.project-form { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.project-form label { display: grid; gap: .4rem; color: #53615c; font-size: .74rem; font-weight: 700; }
+.project-form input { min-height: 2.6rem; padding: .55rem .7rem; border: 1px solid #cfd8d4; border-radius: .4rem; color: #17212b; }
+.project-form input:focus { border-color: #1c594b; outline: 3px solid #1c594b18; }
+.revision-meta { display: flex; flex-wrap: wrap; gap: .5rem 1rem; padding-top: 1rem; border-top: 1px solid #edf0ef; color: #718079; font-size: .68rem; }
 
 @media (max-width: 1050px) {
   .sidebar { width: 15.5rem; }
@@ -130,7 +142,8 @@ h1, h2, p { margin: 0; }
   .menu-button { display: grid; }
   .topbar { padding: .65rem 1rem; }
   .project-selector select { min-width: 0; max-width: 9rem; }
-  .project-meta, .save-state { display: none; }
+  .project-meta { display: none; }
+  .new-project-button { display: none; }
   .validation-label { display: none; }
   .validation-button { width: 2.3rem; justify-content: center; padding: .3rem; }
   .main-content { padding: 1.25rem 1rem; }
@@ -144,6 +157,7 @@ h1, h2, p { margin: 0; }
   .stage-list li { grid-template-columns: 2.2rem minmax(0, 1fr); padding: .5rem 0; }
   .stage-status { grid-column: 2; justify-self: start; }
   .module-placeholder { align-items: flex-start; flex-direction: column; }
+  .project-form { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) { .sidebar { transition: none; } }

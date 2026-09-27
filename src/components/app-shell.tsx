@@ -4,10 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { navigationGroups } from "../lib/navigation";
+import { useProjects } from "./project-provider";
 
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { active, createProject, projects, saveStatus, selectProject } = useProjects();
+  const saveLabels = { loading: "Memuat…", saved: "Tersimpan", saving: "Menyimpan…", unsaved: "Belum tersimpan", error: "Gagal menyimpan" };
 
   return (
     <div className="app-shell">
@@ -50,12 +53,16 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
             </button>
             <label className="project-selector">
               <span>Proyek</span>
-              <select aria-label="Pilih proyek" defaultValue="new-project"><option value="new-project">Proyek Baru</option></select>
+              <select aria-label="Pilih proyek" value={active?.project.id ?? ""} onChange={(event) => void selectProject(event.target.value)} disabled={!projects.length || saveStatus !== "saved"}>
+                {!projects.length && <option value="">Belum ada proyek</option>}
+                {projects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}
+              </select>
             </label>
-            <div className="project-meta" aria-label="Status proyek"><span className="badge badge-neutral">Draft</span><span>Revisi 0</span></div>
+            <button className="new-project-button" type="button" onClick={() => void createProject()} disabled={saveStatus !== "saved"}>+ Proyek</button>
+            <div className="project-meta" aria-label="Status proyek"><span className="badge badge-neutral">Draft</span><span>Revisi {active?.revision.revision_number ?? "—"}</span></div>
           </div>
           <div className="topbar-actions">
-            <div className="save-state" title="Penyimpanan proyek tersedia pada milestone berikutnya"><span className="status-dot status-dot-muted" aria-hidden="true" />Belum tersimpan</div>
+            <div className={`save-state save-state-${saveStatus}`} role="status"><span className="status-dot" aria-hidden="true" />{saveLabels[saveStatus]}</div>
             <button className="validation-button" type="button" title="Belum ada validasi proyek"><span aria-hidden="true">!</span><span className="validation-label">Pusat validasi</span></button>
           </div>
         </header>

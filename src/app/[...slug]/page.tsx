@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { navigationItems } from "../../lib/navigation";
+import { ProjectData } from "../../components/project-data";
 
 type PageProps = { params: Promise<{ slug: string[] }> };
 
@@ -15,6 +16,10 @@ export default async function ModulePage({ params }: PageProps) {
   const { slug } = await params;
   const item = navigationItems.find((entry) => entry.href === `/${slug.join("/")}`);
   if (!item || !("number" in item)) notFound();
+
+  if (item.href === "/data-proyek") {
+    return <div className="page"><header className="page-heading"><div><p className="eyebrow">Workspace proyek</p><h1>Data Proyek</h1><p className="page-description">Data tersimpan otomatis dan dapat dibuka kembali pada sesi berikutnya.</p></div></header><ProjectData /></div>;
+  }
 
   return (
     <div className="page">
