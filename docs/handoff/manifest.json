@@ -1,0 +1,21 @@
+{
+  "package_name": "STRUCAL_CODEX_HANDOFF_V1",
+  "created": "2026-09-27",
+  "files": [
+    "00_README.md",
+    "01_PRD_FINAL.md",
+    "02_APP_FLOW_IA.md",
+    "03_UI_UX_BLUEPRINT.md",
+    "04_CALCULATION_ENGINE_SPEC.md",
+    "05_CODE_REGISTRY_SNI.md",
+    "06_DATA_MODEL.md",
+    "07_ETABS_DATA_CONTRACT.md",
+    "08_REPORT_SPEC.md",
+    "09_TEST_AND_ACCEPTANCE.md",
+    "10_GIT_GITHUB_RAILWAY.md",
+    "11_IMPLEMENTATION_PLAN.md",
+    "12_CODEX_MASTER_PROMPT.md",
+    "13_DECISION_LOG.md",
+    "tasks.yaml"
+  ]
+}

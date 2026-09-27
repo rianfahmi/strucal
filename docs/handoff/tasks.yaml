@@ -1,0 +1,46 @@
+project: "StruCal Reinforced Concrete V1"
+execution_policy:
+  canonical_source: GitHub
+  production_branch: main
+  integration_branch: develop
+  commit_each_logical_task: true
+  push_each_completed_stage: true
+  stop_after_dod: true
+  verbose_progress: false
+milestones:
+  - id: M0
+    name: Foundation
+    production_required: true
+    tasks: ["M0.1 GitHub + app init", "M0.2 Railway + health deploy"]
+  - id: M1
+    name: Application Shell
+  - id: M2
+    name: Project Persistence
+  - id: M3
+    name: Geometry
+  - id: M4
+    name: Material
+  - id: M5
+    name: Loads
+  - id: M6
+    name: Seismic
+  - id: M7
+    name: ETABS Input Summary
+  - id: M8
+    name: Generate #1
+    release: v0.1-generate-1
+    production_required: true
+  - id: M9
+    name: ETABS Import
+  - id: M10
+    name: Envelope
+  - id: M11
+    name: Beam Design
+  - id: M12
+    name: Column Design
+  - id: M13
+    name: SCWB
+  - id: M14
+    name: Foundation
+  - id: M15
+    name: Generate #2
