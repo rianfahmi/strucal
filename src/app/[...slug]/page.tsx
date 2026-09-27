@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { navigationItems } from "../../lib/navigation";
 import { ProjectData } from "../../components/project-data";
 import { GeometryWorkspace } from "../../components/geometry-workspace";
+import { MaterialWorkspace } from "../../components/material-workspace";
 
 type PageProps = { params: Promise<{ slug: string[] }> };
 
@@ -24,6 +25,10 @@ export default async function ModulePage({ params }: PageProps) {
 
   if (item.href === "/geometri-model") {
     return <div className="page geometry-page"><header className="page-heading"><div><p className="eyebrow">Tahap 1 · Parameter Awal</p><h1>Geometri &amp; Model</h1><p className="page-description">Susun grid dan story, lalu validasi geometri pada viewer terpadu.</p></div></header><GeometryWorkspace /></div>;
+  }
+
+  if (item.href === "/material") {
+    return <div className="page material-page"><header className="page-heading"><div><p className="eyebrow">Tahap 1 · Parameter Awal</p><h1>Material</h1><p className="page-description">Kelola properti beton dan tulangan dengan unit serta sumber nilai yang eksplisit.</p></div></header><MaterialWorkspace /></div>;
   }
 
   return (
