@@ -30,6 +30,10 @@ npm run build
 
 Railway menjalankan `npm run build` dan `npm start`. Production mengikuti branch `main`.
 
+Production: <https://strucal-production-7d9b.up.railway.app>
+
+Health: <https://strucal-production-7d9b.up.railway.app/health>
+
 ## Dokumentasi produk
 
 Handoff proyek tersimpan di [`docs/handoff`](docs/handoff). Ikuti `00_README.md`, `tasks.yaml`, dan `11_IMPLEMENTATION_PLAN.md` sebelum memulai milestone.
