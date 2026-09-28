@@ -91,7 +91,7 @@ test("hasil M6 tersimpan pada revisi aktif dan perubahan upstream menginvalidasi
     ids("project-1", "revision-1"),
     () => "2026-09-28T00:00:00.000Z",
   );
-  const derived: SeismicResult = { status: "REQUIRES_REGISTRY_DATA", warnings: ["missing"], coefficients: null, spectrum: null, kds_review: null, system_eligibility: [], system_parameters: null, period: null, response_coefficient: null, seismic_weight: null, base_shear: null, story_forces: [], response_spectrum: [] };
+  const derived: SeismicResult = { status: "VALID", warnings: [], coefficients: null, spectrum: null, kds_review: null, system_eligibility: [], system_parameters: null, period: null, response_coefficient: null, seismic_weight: null, base_shear: null, story_forces: [], response_spectrum: [] };
   const result = { ...initial.seismic, raw_inputs: { ss: 1, s1: 0.5, site_class: "TEST", risk_category: "TEST" }, derived_results: derived };
   const saved = reviseSeismic(initial, result, "manual", ids("revision-2"), () => "2026-09-28T00:01:00.000Z");
   assert.equal(saved.seismic.revision_id, "revision-2");
@@ -100,4 +100,5 @@ test("hasil M6 tersimpan pada revisi aktif dan perubahan upstream menginvalidasi
   const invalidated = reviseGeometry(saved, changedGeometry, "manual", ids("revision-3"), () => "2026-09-28T00:02:00.000Z");
   assert.equal(invalidated.seismic.derived_results, null);
   assert.equal(invalidated.seismic.raw_inputs.ss, 1);
+  assert.throws(() => reviseSeismic(initial, { ...result, selected_structural_system_id: "blocked" }, "manual"), /tidak berstatus ALLOWED/);
 });

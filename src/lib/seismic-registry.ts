@@ -1,7 +1,20 @@
 import type { SeismicContext, SeismicRawInputs, TraceValue } from "./seismic.ts";
 
-export type KdsCheck = { rule_id: string; label: string; result: string; standard_ref: string };
-export type KdsReview = { checks: KdsCheck[]; governing_kds: string; standard_ref: string };
+export type KdsCheck = {
+  rule_id: string;
+  label: string;
+  input_value: number;
+  input_unit: string;
+  result: string;
+  formula: string;
+  substitution: string;
+  standard_ref: string;
+  registry_version: string;
+  engine_version: string;
+  status: "VALID" | "WARNING";
+  warning: string | null;
+};
+export type KdsReview = { risk_category: string; sds: TraceValue; sd1: TraceValue; checks: KdsCheck[]; governing_kds: string; standard_ref: string };
 export type SystemEligibility = {
   id: string;
   label: string;
@@ -22,6 +35,7 @@ export type SeismicRuleSet = {
   system_parameters: (systemId: string) => SystemParameters;
   period: (height: number, parameters: SystemParameters) => PeriodResult;
   response_coefficient: (spectrum: Record<"sds" | "sd1", TraceValue>, parameters: SystemParameters, period: PeriodResult) => TraceValue;
+  base_shear: (responseCoefficient: TraceValue, seismicWeight: TraceValue) => TraceValue;
   story_distribution: (baseShear: TraceValue, stories: SeismicContext["stories"]) => StoryForce[];
   response_spectrum: (spectrum: Record<"sds" | "sd1", TraceValue>) => SpectrumPoint[];
 };
@@ -35,6 +49,23 @@ export type SeismicRegistry = {
   reviewed_at: string | null;
   missing_rules: string[];
   rules: SeismicRuleSet | null;
+};
+
+export type ApprovedSeismicRuleRecord = {
+  registry_version: string;
+  standard_number: string;
+  standard_year: number;
+  status: "APPROVED";
+  rule_id: string;
+  rule_type: "TABLE" | "FORMULA" | "SYSTEM_CONSTRAINT";
+  table_or_clause_ref: string;
+  conditions: Record<string, string | number>;
+  result: string | number;
+  unit: string;
+  effective_from: string;
+  reviewed_by: string;
+  reviewed_at: string;
+  source_note: string;
 };
 
 const REQUIRED_RULES = [

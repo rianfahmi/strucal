@@ -61,11 +61,12 @@ export function createDefaultSeismic(revisionId: string, registryVersion: string
 export function seismicContext(stories: Story[], seismicWeight: SeismicWeightResult, concreteMaterial: boolean, engineVersion: string): SeismicContext {
   const weights = new Map(seismicWeight.by_story.map(({ story, value }) => [story, value]));
   const levels = stories.filter(({ order }) => order > 0);
+  const baseElevation = stories[0]?.elevation ?? 0;
   return {
-    building_height: levels.at(-1)?.elevation ?? 0,
+    building_height: (levels.at(-1)?.elevation ?? baseElevation) - baseElevation,
     concrete_material: concreteMaterial,
     seismic_weight: seismicWeight,
-    stories: levels.map(({ name, elevation }) => ({ story: name, elevation, weight: weights.get(name) ?? 0 })),
+    stories: levels.map(({ name, elevation }) => ({ story: name, elevation: elevation - baseElevation, weight: weights.get(name) ?? 0 })),
     engine_version: engineVersion,
   };
 }
@@ -115,17 +116,18 @@ export function calculateSeismic(model: SeismicModel, context: SeismicContext, r
   const period = registry.rules.period(context.building_height, systemParameters);
   const responseCoefficient = registry.rules.response_coefficient(spectrum, systemParameters, period);
   const seismicWeight = inherited(context.seismic_weight.value, "kN", "LOAD.SW.AGGREGATE.1", { revision_weight: context.seismic_weight.value }, registry, context);
-  const baseShear: TraceValue = {
-    value: responseCoefficient.value * seismicWeight.value, unit: "kN", provenance: "AUTO", formula_id: "SEISMIC.BASE_SHEAR",
-    formula: "V = Cs × W", substitution: `V = ${responseCoefficient.value} × ${seismicWeight.value}`,
-    source_inputs: { Cs: responseCoefficient.value, W: seismicWeight.value }, standard_ref: responseCoefficient.standard_ref,
-    registry_version: registry.registry_version, engine_version: context.engine_version, status: "VALID", warning: null,
-  };
+  const baseShear = registry.rules.base_shear(responseCoefficient, seismicWeight);
+  const storyForces = registry.rules.story_distribution(baseShear, context.stories);
+  const responseSpectrum = registry.rules.response_spectrum(spectrum);
+  const values = [coefficients.fa, coefficients.fv, ...Object.values(spectrum), ...Object.values(systemParameters), period.ta, ...(period.limit ? [period.limit] : []), responseCoefficient, seismicWeight, baseShear, ...storyForces.map(({ force }) => force), ...responseSpectrum.map(({ acceleration }) => acceleration)];
+  if (values.some(({ value, unit, formula_id, standard_ref, registry_version, engine_version }) => !Number.isFinite(value) || !unit || !formula_id || !standard_ref || registry_version !== registry.registry_version || engine_version !== context.engine_version)) {
+    return baseResult("REQUIRES_REGISTRY_DATA", ["Registry menghasilkan nilai atau provenance yang tidak valid."]);
+  }
   return {
     ...partial, status: "VALID", system_parameters: systemParameters, period, response_coefficient: responseCoefficient,
     seismic_weight: seismicWeight, base_shear: baseShear,
-    story_forces: registry.rules.story_distribution(baseShear, context.stories),
-    response_spectrum: registry.rules.response_spectrum(spectrum),
+    story_forces: storyForces,
+    response_spectrum: responseSpectrum,
   };
 }
 

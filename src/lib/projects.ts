@@ -1,8 +1,9 @@
 import { createDefaultGeometry, validateGeometry, type Geometry } from "./geometry.ts";
 import { createDefaultMaterials, validateMaterials, type Materials } from "./materials.ts";
-import { createDefaultLoads, validateLoads, type Loads } from "./loads.ts";
+import { calculateSeismicWeight, createDefaultLoads, validateLoads, type Loads } from "./loads.ts";
 import { getCombinationRegistry } from "./load-registry.ts";
-import { createDefaultSeismic, type SeismicModel } from "./seismic.ts";
+import { calculateSeismic, createDefaultSeismic, seismicContext, type SeismicModel } from "./seismic.ts";
+import { getSeismicRegistry } from "./seismic-registry.ts";
 
 export const REGISTRY_VERSION = "SNI-1726:2019|SNI-1727:2020|SNI-2847:2019";
 export const ENGINE_VERSION = "0.0.0";
@@ -204,6 +205,11 @@ export function reviseSeismic(
   now: () => string = () => new Date().toISOString(),
 ): ProjectBundle {
   if (seismic.registry_version !== current.revision.registry_version) throw new Error("Versi registry seismik tidak sama dengan revisi proyek.");
+  const context = seismicContext(current.geometry.stories, calculateSeismicWeight(current.loads, current.geometry, current.revision.registry_version), current.materials.concrete.type === "concrete", ENGINE_VERSION);
+  const result = calculateSeismic(seismic, context, getSeismicRegistry(current.revision.registry_version));
+  if (seismic.selected_structural_system_id && !result.system_eligibility.some(({ id, status }) => id === seismic.selected_structural_system_id && status === "ALLOWED")) {
+    throw new Error("Sistem struktur tidak berstatus ALLOWED pada registry aktif.");
+  }
   const createdAt = now();
   const revisionId = id();
   return {
@@ -216,7 +222,7 @@ export function reviseSeismic(
     geometry: { ...current.geometry, revision_id: revisionId },
     materials: { ...current.materials, revision_id: revisionId },
     loads: reviseLoadIds(current.loads, revisionId),
-    seismic: reviseSeismicId(seismic, revisionId, false),
+    seismic: reviseSeismicId({ ...seismic, derived_results: result }, revisionId, false),
   };
 }
 
