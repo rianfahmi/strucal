@@ -326,7 +326,43 @@ h1, h2, p { margin: 0; }
 .seismic-validation.has-error { border: 1px solid #ead7aa; background: #fff9eb; color: #74530f; }
 .save-seismic { width: 100%; margin-top: 1rem; }
 
+.etabs-page { width: min(106rem, 100%); }
+.etabs-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: .8rem; align-items: start; }
+.etabs-content { display: grid; min-width: 0; gap: .8rem; }
+.etabs-hero { display: flex; justify-content: space-between; gap: 1rem; border-left: 4px solid #b85858; }
+.etabs-hero h2 { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; }
+.etabs-hero p:not(.eyebrow), .etabs-hero > small { margin-top: .5rem; color: #63736d; font-size: .72rem; line-height: 1.5; }
+.etabs-stale, .etabs-review { color: #875d0c !important; }
+.etabs-section { min-width: 0; }
+.etabs-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .8rem; }
+.etabs-section-heading small { display: block; margin-top: .25rem; color: #78857f; font-size: .65rem; }
+.etabs-section-heading a, .etabs-checklist a { color: #1c594b; font-size: .68rem; font-weight: 700; white-space: nowrap; }
+.etabs-section .seismic-table { min-width: 30rem; }
+.etabs-two-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+.etabs-two-columns h3 { margin-bottom: .45rem; font-size: .76rem; }
+.etabs-note, .etabs-review { margin: .65rem 0 0; color: #63736d; font-size: .72rem; line-height: 1.5; }
+.etabs-field-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; }
+.etabs-field-grid > div { display: grid; gap: .4rem; min-width: 0; padding: .55rem; border: 1px solid #e5eae8; border-radius: .35rem; }
+.etabs-field-grid span { color: #63736d; font-size: .66rem; }
+.etabs-field-grid span small { margin-left: .2rem; color: #3d5f86; font-size: .55rem; font-weight: 800; }
+.etabs-field-grid strong { overflow-wrap: anywhere; font-size: .78rem; }
+.etabs-spectrum { max-height: 21rem; }
+.etabs-status { padding: .2rem .4rem; border-radius: .3rem; font-size: .62rem; letter-spacing: .025em; }
+.etabs-status.is-ready { background: #e8f2ee; color: #28604f; }
+.etabs-status.is-warning { background: #fff3d9; color: #875d0c; }
+.etabs-status.is-blocked { background: #f9eaea; color: #9d3333; }
+.etabs-checklist { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+.etabs-checklist > p { margin-top: .4rem; color: #63736d; font-size: .7rem; }
+.etabs-checklist ul { margin: .75rem 0 0; padding: 0; list-style: none; }
+.etabs-checklist li { padding: .6rem 0; border-top: 1px solid #edf0ef; }
+.etabs-checklist li > div { display: flex; align-items: flex-start; justify-content: space-between; gap: .4rem; }
+.etabs-checklist li > div > strong { color: #293a34; font-size: .7rem; }
+.etabs-checklist li p { margin: .25rem 0; color: #63736d; font-size: .65rem; line-height: 1.4; }
+
 @media (max-width: 1050px) {
+  .etabs-workspace { grid-template-columns: 1fr; }
+  .etabs-checklist { position: static; max-height: none; grid-row: 1; }
+  .etabs-checklist ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem; }
   .sidebar { width: 15.5rem; }
   .workspace { margin-left: 15.5rem; }
   .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -337,6 +373,8 @@ h1, h2, p { margin: 0; }
 }
 
 @media (max-width: 760px) {
+  .etabs-two-columns { grid-template-columns: 1fr; }
+  .etabs-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sidebar { width: min(19rem, 86vw); transform: translateX(-105%); transition: transform 180ms ease; box-shadow: 8px 0 28px #10251f33; }
   .sidebar-open { transform: translateX(0); }
   .sidebar-backdrop { position: fixed; inset: 0; z-index: 25; display: block; border: 0; background: #0e211c80; }
@@ -364,6 +402,8 @@ h1, h2, p { margin: 0; }
 }
 
 @media (max-width: 480px) {
+  .etabs-hero, .etabs-section-heading { flex-direction: column; }
+  .etabs-checklist ul { grid-template-columns: 1fr; }
   .summary-grid { grid-template-columns: 1fr; }
   .summary-card { min-height: 7.5rem; }
   .stage-list li { grid-template-columns: 2.2rem minmax(0, 1fr); padding: .5rem 0; }

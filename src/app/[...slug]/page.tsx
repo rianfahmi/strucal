@@ -7,6 +7,7 @@ import { GeometryWorkspace } from "../../components/geometry-workspace";
 import { MaterialWorkspace } from "../../components/material-workspace";
 import { LoadWorkspace } from "../../components/load-workspace";
 import { SeismicWorkspace } from "../../components/seismic-workspace";
+import { EtabsWorkspace } from "../../components/etabs-workspace";
 
 type PageProps = { params: Promise<{ slug: string[] }> };
 
@@ -39,6 +40,10 @@ export default async function ModulePage({ params }: PageProps) {
 
   if (item.href === "/analisa-gempa") {
     return <div className="page seismic-page"><header className="page-heading"><div><p className="eyebrow">Tahap 1 · Parameter Awal</p><h1>Analisa Gempa</h1><p className="page-description">Input mentah, review KDS dan sistem struktur, lalu hasil seismik dengan trace perhitungan.</p></div></header><SeismicWorkspace /></div>;
+  }
+
+  if (item.href === "/input-etabs") {
+    return <div className="page etabs-page"><header className="page-heading"><div><p className="eyebrow">Tahap 1 · Handoff Manual</p><h1>Input ETABS</h1><p className="page-description">Ringkasan otomatis dari revisi proyek aktif. Koreksi data dilakukan di modul sumber.</p></div></header><EtabsWorkspace /></div>;
   }
 
   return (
