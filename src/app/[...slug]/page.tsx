@@ -8,6 +8,7 @@ import { MaterialWorkspace } from "../../components/material-workspace";
 import { LoadWorkspace } from "../../components/load-workspace";
 import { SeismicWorkspace } from "../../components/seismic-workspace";
 import { EtabsWorkspace } from "../../components/etabs-workspace";
+import { ReportWorkspaceView } from "../../components/report-workspace";
 
 type PageProps = { params: Promise<{ slug: string[] }> };
 
@@ -44,6 +45,10 @@ export default async function ModulePage({ params }: PageProps) {
 
   if (item.href === "/input-etabs") {
     return <div className="page etabs-page"><header className="page-heading"><div><p className="eyebrow">Tahap 1 · Handoff Manual</p><h1>Input ETABS</h1><p className="page-description">Ringkasan otomatis dari revisi proyek aktif. Koreksi data dilakukan di modul sumber.</p></div></header><EtabsWorkspace /></div>;
+  }
+
+  if (item.href === "/generate-1") {
+    return <div className="page report-page"><header className="page-heading"><div><p className="eyebrow">Tahap 1 · Report Snapshot</p><h1>Generate #1</h1><p className="page-description">Review struktur, tabel, gambar, caption, dan revisi sebelum menghasilkan DOCX.</p></div></header><ReportWorkspaceView /></div>;
   }
 
   return (

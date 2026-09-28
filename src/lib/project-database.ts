@@ -3,9 +3,10 @@ import { createDefaultGeometry, type Geometry } from "./geometry";
 import { createDefaultMaterials, type Materials } from "./materials";
 import { createDefaultLoads, type Loads } from "./loads";
 import { createDefaultSeismic, normalizeSeismic, type SeismicModel } from "./seismic";
+import type { ReportAsset, ReportSnapshot, ReportWorkspace } from "./report";
 
 const DATABASE_NAME = "strucal";
-const DATABASE_VERSION = 5;
+const DATABASE_VERSION = 6;
 
 function requestResult<T>(request: IDBRequest<T>) {
   return new Promise<T>((resolve, reject) => {
@@ -36,10 +37,86 @@ function openDatabase() {
       if (!database.objectStoreNames.contains("materials")) database.createObjectStore("materials", { keyPath: "revision_id" });
       if (!database.objectStoreNames.contains("loads")) database.createObjectStore("loads", { keyPath: "revision_id" });
       if (!database.objectStoreNames.contains("seismic")) database.createObjectStore("seismic", { keyPath: "revision_id" });
+      if (!database.objectStoreNames.contains("report_workspaces")) database.createObjectStore("report_workspaces", { keyPath: "project_id" });
+      if (!database.objectStoreNames.contains("report_assets")) database.createObjectStore("report_assets", { keyPath: "asset_id" });
+      if (!database.objectStoreNames.contains("report_snapshots")) {
+        const snapshots = database.createObjectStore("report_snapshots", { keyPath: "report_snapshot_id" });
+        snapshots.createIndex("project_id", "project_id");
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("Database proyek tidak dapat dibuka."));
   });
+}
+
+export async function getReportWorkspace(projectId: string) {
+  const database = await openDatabase();
+  try {
+    const transaction = database.transaction("report_workspaces", "readonly");
+    const workspace = await requestResult(transaction.objectStore("report_workspaces").get(projectId) as IDBRequest<ReportWorkspace | undefined>);
+    await transactionDone(transaction);
+    return workspace ?? null;
+  } finally {
+    database.close();
+  }
+}
+
+export async function persistReportWorkspace(workspace: ReportWorkspace) {
+  const database = await openDatabase();
+  try {
+    const transaction = database.transaction("report_workspaces", "readwrite");
+    transaction.objectStore("report_workspaces").put(workspace);
+    await transactionDone(transaction);
+  } finally {
+    database.close();
+  }
+}
+
+export async function persistReportAsset(asset: ReportAsset) {
+  const database = await openDatabase();
+  try {
+    const transaction = database.transaction("report_assets", "readwrite");
+    transaction.objectStore("report_assets").put(asset);
+    await transactionDone(transaction);
+  } finally {
+    database.close();
+  }
+}
+
+export async function getReportAssets(assetIds: string[]) {
+  const database = await openDatabase();
+  try {
+    const transaction = database.transaction("report_assets", "readonly");
+    const store = transaction.objectStore("report_assets");
+    const assets = await Promise.all(assetIds.map((id) => requestResult(store.get(id) as IDBRequest<ReportAsset | undefined>)));
+    await transactionDone(transaction);
+    return assets.filter((asset): asset is ReportAsset => Boolean(asset));
+  } finally {
+    database.close();
+  }
+}
+
+export async function persistReportSnapshot(snapshot: ReportSnapshot) {
+  const database = await openDatabase();
+  try {
+    const transaction = database.transaction("report_snapshots", "readwrite");
+    transaction.objectStore("report_snapshots").add(snapshot);
+    await transactionDone(transaction);
+  } finally {
+    database.close();
+  }
+}
+
+export async function listReportSnapshots(projectId: string) {
+  const database = await openDatabase();
+  try {
+    const transaction = database.transaction("report_snapshots", "readonly");
+    const snapshots = await requestResult(transaction.objectStore("report_snapshots").index("project_id").getAll(projectId) as IDBRequest<ReportSnapshot[]>);
+    await transactionDone(transaction);
+    return snapshots.sort((left, right) => right.generated_at.localeCompare(left.generated_at));
+  } finally {
+    database.close();
+  }
 }
 
 export async function listProjects() {

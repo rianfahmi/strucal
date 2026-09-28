@@ -11,6 +11,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "m8:fixture": "node --experimental-strip-types scripts/generate-m8-fixture.ts",
     "build": "next build",
     "start": "next start"
   },
