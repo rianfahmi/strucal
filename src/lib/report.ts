@@ -1,5 +1,6 @@
 import { createEtabsHandoff } from "./etabs-handoff.ts";
 import type { ProjectBundle } from "./projects.ts";
+import { REPORT_MASTER_FILE, REPORT_TEMPLATE_MANIFEST } from "./report-template-manifest.ts";
 
 export type ReportStatus = "READY" | "WARNING" | "BLOCKED";
 export type FigureSourceType = "AUTO_GENERATED" | "USER_UPLOAD" | "REFERENCE_PLACEHOLDER";
@@ -82,7 +83,7 @@ export type ReportSnapshot = {
   file_name: string;
 };
 
-export const REPORT_TEMPLATE_REFERENCE = "185.1. Laporan Bagian Depan(1).docx";
+export const REPORT_TEMPLATE_REFERENCE = REPORT_MASTER_FILE;
 
 const SECTION_TEMPLATE: Omit<ReportSection, "status">[] = [
   { section_id: "front", chapter: "FRONT MATTER", title: "Sampul dan Daftar", level: 1, order_index: 0 },
@@ -171,7 +172,7 @@ export function createReportWorkspace(bundle: ProjectBundle, previous?: ReportWo
       effective_caption: prior?.caption_override.trim() || default_caption,
       source_type, system_image_source,
       uploaded_asset_reference: prior?.uploaded_asset_reference ?? null,
-      reference_example_reference: system_image_source ? null : REPORT_TEMPLATE_REFERENCE,
+      reference_example_reference: REPORT_TEMPLATE_MANIFEST.figures[figure_id as keyof typeof REPORT_TEMPLATE_MANIFEST.figures]?.example ?? null,
       required,
       status: blocked && required ? "BLOCKED" : source_type === "REFERENCE_PLACEHOLDER" ? "WARNING" : "READY",
       project_revision: bundle.revision.id,
@@ -179,14 +180,13 @@ export function createReportWorkspace(bundle: ProjectBundle, previous?: ReportWo
   });
   const tables = TABLE_TEMPLATE.map(([table_id, section_id, default_caption, source_module], order_index): ReportTable => {
     const prior = previousTables.get(table_id);
-    const optionalEmpty = table_id === "load-combinations" && !handoff.combinations.length;
     return {
       table_id, section_id, order_index, default_caption,
       caption_override: prior?.caption_override ?? "",
       effective_caption: prior?.caption_override.trim() || default_caption,
       source_module, data_revision: bundle.revision.id,
-      required: table_id !== "load-combinations",
-      status: blocked ? "BLOCKED" : optionalEmpty ? "WARNING" : "READY",
+      required: true,
+      status: blocked ? "BLOCKED" : "READY",
     };
   });
   return {

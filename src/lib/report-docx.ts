@@ -1,17 +1,26 @@
-import { deflateSync } from "node:zlib";
+import { readFileSync } from "node:fs";
+import { join as joinPath } from "node:path";
+import { deflateRawSync, deflateSync, inflateRawSync } from "node:zlib";
 import { createEtabsHandoff } from "./etabs-handoff.ts";
 import { spacingsFromOrdinates } from "./geometry.ts";
 import type { LoadCategory } from "./loads.ts";
 import type { ProjectBundle } from "./projects.ts";
 import type { ReportAsset, ReportFigure, ReportSnapshot } from "./report.ts";
+import { REPORT_MASTER_FILE, REPORT_TEMPLATE_MANIFEST } from "./report-template-manifest.ts";
 
 export type ReportGenerationInput = { bundle: ProjectBundle; snapshot: ReportSnapshot; assets: ReportAsset[] };
 type TableData = { id: string; headers: string[]; rows: (string | number | null | undefined)[][] };
-type Media = { id: string; name: string; contentType: string; data: Uint8Array };
+type Media = { id: string; name: string; contentType: "image/png" | "image/jpeg"; data: Uint8Array };
+type PackageFile = { name: string; data: Uint8Array };
 
 const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+const masterPath = () => joinPath(process.cwd(), "templates", REPORT_MASTER_FILE);
 const xml = (value: unknown) => String(value ?? "—").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character]!);
-const fixed = (value: number | null | undefined, unit = "") => value === null || value === undefined ? "—" : `${Number(value.toFixed(4))}${unit ? ` ${unit}` : ""}`;
+const decodeXml = (value: string) => value.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+const number = (value: number | null | undefined, digits = 3) => value === null || value === undefined ? "—" : new Intl.NumberFormat("id-ID", { useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+const value = (input: number | null | undefined, unit = "", digits = 3) => input === null || input === undefined ? "—" : `${number(input, digits)}${unit ? ` ${unit}` : ""}`;
+const reportText = (input: string) => input.split(";").map((part) => part.trim()).filter((part) => part && !/ENGINEER_APPROVED|\bM[3-7]\b|\bM[3-7]\s+V\d+|active revision|registry|source[_ ]hash|debug/i.test(part)).join("; ") || "—";
 
 function crc32(data: Uint8Array) {
   let crc = 0xffffffff;
@@ -36,64 +45,154 @@ function join(parts: Uint8Array[]) {
   return output;
 }
 
-function zip(files: { name: string; data: Uint8Array }[]) {
+function readZip(data: Uint8Array) {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let eocd = data.length - 22;
+  while (eocd >= 0 && view.getUint32(eocd, true) !== 0x06054b50) eocd -= 1;
+  if (eocd < 0) throw new Error("Master DOCX tidak memiliki ZIP central directory yang valid.");
+  const count = view.getUint16(eocd + 10, true);
+  let cursor = view.getUint32(eocd + 16, true);
+  const files = new Map<string, Uint8Array>();
+  for (let index = 0; index < count; index += 1) {
+    if (view.getUint32(cursor, true) !== 0x02014b50) throw new Error("Master DOCX memiliki central entry yang tidak valid.");
+    const method = view.getUint16(cursor + 10, true);
+    const compressedSize = view.getUint32(cursor + 20, true);
+    const nameLength = view.getUint16(cursor + 28, true);
+    const extraLength = view.getUint16(cursor + 30, true);
+    const commentLength = view.getUint16(cursor + 32, true);
+    const localOffset = view.getUint32(cursor + 42, true);
+    const name = decoder.decode(data.subarray(cursor + 46, cursor + 46 + nameLength));
+    const localNameLength = view.getUint16(localOffset + 26, true);
+    const localExtraLength = view.getUint16(localOffset + 28, true);
+    const start = localOffset + 30 + localNameLength + localExtraLength;
+    const compressed = data.subarray(start, start + compressedSize);
+    files.set(name, method === 0 ? compressed.slice() : method === 8 ? inflateRawSync(compressed) : (() => { throw new Error(`Metode ZIP ${method} pada master tidak didukung.`); })());
+    cursor += 46 + nameLength + extraLength + commentLength;
+  }
+  return files;
+}
+
+function zip(files: PackageFile[]) {
   const local: Uint8Array[] = [];
   const central: Uint8Array[] = [];
   let offset = 0;
   for (const file of files) {
     const name = encoder.encode(file.name);
+    const deflated = deflateRawSync(file.data, { level: 6 });
+    const compressed = deflated.length < file.data.length ? deflated : file.data;
+    const method = compressed === file.data ? 0 : 8;
     const crc = crc32(file.data);
-    const localHeader = join([integer(0x04034b50, 4), integer(20, 2), integer(0x0800, 2), integer(0, 2), integer(0, 2), integer(0, 2), integer(crc, 4), integer(file.data.length, 4), integer(file.data.length, 4), integer(name.length, 2), integer(0, 2), name]);
-    local.push(localHeader, file.data);
-    central.push(join([integer(0x02014b50, 4), integer(20, 2), integer(20, 2), integer(0x0800, 2), integer(0, 2), integer(0, 2), integer(0, 2), integer(crc, 4), integer(file.data.length, 4), integer(file.data.length, 4), integer(name.length, 2), integer(0, 2), integer(0, 2), integer(0, 2), integer(0, 2), integer(0, 4), integer(offset, 4), name]));
-    offset += localHeader.length + file.data.length;
+    const localHeader = join([integer(0x04034b50, 4), integer(20, 2), integer(0x0800, 2), integer(method, 2), integer(0, 2), integer(0, 2), integer(crc, 4), integer(compressed.length, 4), integer(file.data.length, 4), integer(name.length, 2), integer(0, 2), name]);
+    local.push(localHeader, compressed);
+    central.push(join([integer(0x02014b50, 4), integer(20, 2), integer(20, 2), integer(0x0800, 2), integer(method, 2), integer(0, 2), integer(0, 2), integer(crc, 4), integer(compressed.length, 4), integer(file.data.length, 4), integer(name.length, 2), integer(0, 2), integer(0, 2), integer(0, 2), integer(0, 2), integer(0, 4), integer(offset, 4), name]));
+    offset += localHeader.length + compressed.length;
   }
   const directory = join(central);
   return join([...local, directory, integer(0x06054b50, 4), integer(0, 2), integer(0, 2), integer(files.length, 2), integer(files.length, 2), integer(directory.length, 4), integer(offset, 4), integer(0, 2)]);
 }
 
-function paragraph(text: string, style = "Normal", options: { align?: "center" | "both" | "right" | "left"; pageBreakBefore?: boolean; bold?: boolean; italic?: boolean; keepNext?: boolean; firstLine?: boolean } = {}) {
-  const properties = [`<w:pStyle w:val="${style}"/>`, options.align ? `<w:jc w:val="${options.align}"/>` : "", options.pageBreakBefore ? "<w:pageBreakBefore/>" : "", options.keepNext ? "<w:keepNext/>" : "", options.firstLine === false ? '<w:ind w:firstLine="0"/>' : ""].join("");
-  const run = options.bold || options.italic ? `<w:rPr>${options.bold ? "<w:b/>" : ""}${options.italic ? "<w:i/>" : ""}</w:rPr>` : "";
+function splitBody(documentXml: string) {
+  const open = documentXml.match(/<w:body(?:\s[^>]*)?>/);
+  if (!open?.index) throw new Error("Master DOCX tidak memiliki body Word yang dapat dipetakan.");
+  const contentStart = open.index + open[0].length;
+  const contentEnd = documentXml.lastIndexOf("</w:body>");
+  const source = documentXml.slice(contentStart, contentEnd);
+  const children: string[] = [];
+  const tags = /<[^>]+>/g;
+  let depth = 0;
+  let childStart = -1;
+  for (let match = tags.exec(source); match; match = tags.exec(source)) {
+    const token = match[0];
+    if (token.startsWith("<?") || token.startsWith("<!--") || token.startsWith("<!")) continue;
+    const closing = token.startsWith("</");
+    const selfClosing = token.endsWith("/>");
+    if (!closing) {
+      if (depth === 0) childStart = match.index;
+      if (!selfClosing) depth += 1;
+      else if (depth === 0 && childStart >= 0) { children.push(source.slice(childStart, tags.lastIndex)); childStart = -1; }
+    } else {
+      depth -= 1;
+      if (depth === 0 && childStart >= 0) { children.push(source.slice(childStart, tags.lastIndex)); childStart = -1; }
+    }
+  }
+  return { prefix: documentXml.slice(0, contentStart), suffix: documentXml.slice(contentEnd), children };
+}
+
+function textOf(block: string) {
+  return decodeXml([...block.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((match) => match[1]).join(" ")).replace(/\s+/g, " ").trim();
+}
+
+function styleOf(block: string) {
+  return block.match(/<w:pStyle[^>]*w:val="([^"]+)"/)?.[1] ?? "";
+}
+
+function nextTable(children: string[], start: number) {
+  return children.slice(start + 1).find((child) => child.startsWith("<w:tbl")) ?? "";
+}
+
+function findBlock(children: string[], text: string, style?: string) {
+  const index = children.findIndex((child) => textOf(child).startsWith(text) && (!style || styleOf(child) === style));
+  if (index < 0) throw new Error(`Anchor master DOCX tidak ditemukan: ${text}`);
+  return index;
+}
+
+function sectionParagraph(block: string) {
+  const properties = block.match(/<w:pPr>[\s\S]*?<w:sectPr[\s\S]*?<\/w:sectPr>[\s\S]*?<\/w:pPr>/)?.[0];
+  if (!properties) throw new Error("Section break master DOCX tidak dapat dikloning.");
+  return `<w:p>${properties}</w:p>`;
+}
+
+function sourceTable(data: TableData, exemplar: string) {
+  const properties = exemplar.match(/<w:tblPr>[\s\S]*?<\/w:tblPr>/)?.[0] ?? "<w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/></w:tblPr>";
+  const cellProperties = exemplar.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/)?.[0] ?? "<w:tcPr/>";
+  const compact = data.id === "etabs-readiness";
+  const size = compact ? 16 : 20;
+  const line = compact ? 190 : 240;
+  const cell = (content: unknown, header = false) => `<w:tc>${cellProperties}<w:p><w:pPr><w:spacing w:after="0" w:line="${line}" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="${header ? "center" : "left"}"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/>${header ? "<w:b/>" : ""}<w:sz w:val="${size}"/></w:rPr><w:t xml:space="preserve">${xml(content)}</w:t></w:r></w:p></w:tc>`;
+  const row = (items: unknown[], header = false) => `<w:tr><w:trPr><w:cantSplit/>${header ? "<w:tblHeader/>" : ""}</w:trPr>${items.map((item) => cell(item, header)).join("")}</w:tr>`;
+  const grid = `<w:tblGrid>${data.headers.map(() => '<w:gridCol w:w="2000"/>').join("")}</w:tblGrid>`;
+  return `<w:tbl>${properties}${grid}${row(data.headers, true)}${data.rows.map((items) => row(items)).join("")}</w:tbl>`;
+}
+
+function paragraph(text: string, style = "3Normal", options: { align?: "center" | "both" | "right" | "left"; pageBreakBefore?: boolean; bold?: boolean; firstLine?: boolean } = {}) {
+  const properties = [`<w:pStyle w:val="${style}"/>`, options.pageBreakBefore ? "<w:pageBreakBefore/>" : "", options.firstLine === false ? '<w:ind w:firstLine="0"/>' : "", options.align ? `<w:jc w:val="${options.align}"/>` : ""].join("");
   const content = text.split("\n").map((line) => `<w:t xml:space="preserve">${xml(line)}</w:t>`).join("<w:br/>");
-  return `<w:p><w:pPr>${properties}</w:pPr><w:r>${run}${content}</w:r></w:p>`;
+  return `<w:p><w:pPr>${properties}</w:pPr><w:r>${options.bold ? "<w:rPr><w:b/></w:rPr>" : ""}${content}</w:r></w:p>`;
 }
 
-function field(instruction: string, display: string) {
-  return `<w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r><w:r><w:instrText xml:space="preserve"> ${xml(instruction)} </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>${xml(display)}</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>`;
+function coverParagraph(text: string, size: number, options: { bold?: boolean; align?: "left" | "right" | "center"; fill?: string; before?: number; after?: number } = {}) {
+  const content = text.split("\n").map((line) => `<w:t xml:space="preserve">${xml(line)}</w:t>`).join("<w:br/>");
+  return `<w:p><w:pPr>${options.fill ? `<w:shd w:val="clear" w:fill="${options.fill}"/>` : ""}<w:spacing w:before="${options.before ?? 0}" w:after="${options.after ?? 120}"/><w:ind w:left="900" w:right="900"/><w:jc w:val="${options.align ?? "left"}"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>${options.bold ? "<w:b/>" : ""}${options.fill ? '<w:color w:val="FFFFFF"/>' : ""}<w:sz w:val="${size}"/></w:rPr>${content}</w:r></w:p>`;
 }
 
-function fieldParagraph(instruction: string, display: string) {
-  return `<w:p><w:pPr><w:keepNext/><w:ind w:firstLine="0"/></w:pPr>${field(instruction, display)}</w:p>`;
+function field(instruction: string, display = "") {
+  return `<w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r><w:r><w:instrText xml:space="preserve"> ${xml(instruction)} </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>${display ? `<w:r><w:t>${xml(display)}</w:t></w:r>` : ""}<w:r><w:fldChar w:fldCharType="end"/></w:r>`;
+}
+
+function fieldParagraph(instruction: string) {
+  return `<w:p><w:pPr><w:ind w:firstLine="0"/></w:pPr>${field(instruction)}</w:p>`;
 }
 
 function caption(label: "Gambar" | "Tabel", title: string) {
-  return `<w:p><w:pPr><w:pStyle w:val="Caption"/><w:jc w:val="center"/><w:keepNext/><w:ind w:firstLine="0"/></w:pPr><w:r><w:t xml:space="preserve">${label} </w:t></w:r>${field(`SEQ ${label} \\* ARABIC`, "1")}<w:r><w:t xml:space="preserve"> ${xml(title)}</w:t></w:r></w:p>`;
+  return `<w:p><w:pPr><w:pStyle w:val="Caption"/><w:keepNext/><w:ind w:firstLine="0"/><w:jc w:val="center"/></w:pPr><w:r><w:t xml:space="preserve">${label} </w:t></w:r>${field(`SEQ ${label} \\* ARABIC`, "1")}<w:r><w:t xml:space="preserve"> ${xml(title)}</w:t></w:r></w:p>`;
 }
 
-function table(data: TableData) {
-  const compact = data.id === "etabs-readiness";
-  const padding = compact ? 35 : 70;
-  const size = compact ? 16 : 20;
-  const line = compact ? 190 : 240;
-  const cell = (value: unknown, header = false) => `<w:tc><w:tcPr><w:tcMar><w:top w:w="${padding}" w:type="dxa"/><w:left w:w="${padding}" w:type="dxa"/><w:bottom w:w="${padding}" w:type="dxa"/><w:right w:w="${padding}" w:type="dxa"/></w:tcMar></w:tcPr><w:p><w:pPr><w:spacing w:after="0" w:line="${line}" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="${header ? "center" : "left"}"/></w:pPr><w:r><w:rPr>${header ? "<w:b/>" : ""}<w:sz w:val="${size}"/></w:rPr><w:t xml:space="preserve">${xml(value)}</w:t></w:r></w:p></w:tc>`;
-  const row = (values: unknown[], header = false) => `<w:tr><w:trPr><w:cantSplit/>${header ? "<w:tblHeader/>" : ""}</w:trPr>${values.map((value) => cell(value, header)).join("")}</w:tr>`;
-  return `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblLayout w:type="autofit"/><w:tblBorders><w:top w:val="single" w:sz="6" w:color="000000"/><w:left w:val="single" w:sz="6" w:color="000000"/><w:bottom w:val="single" w:sz="6" w:color="000000"/><w:right w:val="single" w:sz="6" w:color="000000"/><w:insideH w:val="single" w:sz="4" w:color="000000"/><w:insideV w:val="single" w:sz="4" w:color="000000"/></w:tblBorders></w:tblPr>${row(data.headers, true)}${data.rows.map((values) => row(values)).join("")}</w:tbl>`;
+function equation(line: string) {
+  return `<w:p><w:pPr><w:ind w:firstLine="0"/><w:jc w:val="center"/></w:pPr><m:oMathPara><m:oMath><m:r><m:rPr><m:sty m:val="p"/></m:rPr><m:t>${xml(line)}</m:t></m:r></m:oMath></m:oMathPara></w:p>`;
 }
 
-function picture(media: Media, title: string, drawingId: number, width = 4389120, height = 2633472) {
-  return `<w:p><w:pPr><w:jc w:val="center"/><w:keepNext/><w:ind w:firstLine="0"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${width}" cy="${height}"/><wp:docPr id="${drawingId}" name="${xml(title)}" descr="${xml(title)}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="${xml(media.name)}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${media.id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+function equationTriplet(general: string, substitution: string, result: string) {
+  return [equation(general), equation(substitution), equation(result)];
 }
 
-function placeholder(title: string) {
-  return `<w:p><w:pPr><w:pBdr><w:top w:val="dashed" w:sz="4" w:color="7F7F7F"/><w:left w:val="dashed" w:sz="4" w:color="7F7F7F"/><w:bottom w:val="dashed" w:sz="4" w:color="7F7F7F"/><w:right w:val="dashed" w:sz="4" w:color="7F7F7F"/></w:pBdr><w:spacing w:before="360" w:after="360"/><w:jc w:val="center"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:rPr><w:i/><w:color w:val="666666"/></w:rPr><w:t>${xml(`Slot dokumentasi: ${title} — unggah bukti dari model proyek untuk ditampilkan.`)}</w:t></w:r></w:p>`;
-}
-
-function sectionBreak(format: "none" | "lowerRoman" | "decimal", cover = false) {
-  const footer = format === "none" ? "" : '<w:footerReference w:type="default" r:id="rIdFooter"/>';
-  const numbering = format === "none" ? "" : `<w:pgNumType w:fmt="${format}" w:start="1"/>`;
-  const margins = cover ? '<w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="360" w:footer="360" w:gutter="0"/>' : '<w:pgMar w:top="1701" w:right="1701" w:bottom="1701" w:left="2268" w:header="720" w:footer="720" w:gutter="0"/>';
-  return `<w:p><w:pPr><w:sectPr>${footer}<w:type w:val="nextPage"/><w:pgSz w:w="11906" w:h="16838"/>${margins}${numbering}</w:sectPr></w:pPr></w:p>`;
+function picture(media: Media, title: string, drawingId: number, exemplar?: string) {
+  if (exemplar) {
+    const embeddings = [...exemplar.matchAll(/r:embed="([^"]+)"/g)];
+    if (embeddings.length === 1) return exemplar.replace(`r:embed="${embeddings[0][1]}"`, `r:embed="${media.id}"`).replace(/(<wp:docPr\b[^>]*\bdescr=")[^"]*(")/, `$1${xml(title)}$2`);
+  }
+  const width = 4937760;
+  const height = 2962656;
+  return `<w:p><w:pPr><w:keepNext/><w:ind w:firstLine="0"/><w:jc w:val="center"/></w:pPr><w:r><w:drawing xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${width}" cy="${height}"/><wp:docPr id="${drawingId}" name="${xml(title)}" descr="${xml(title)}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="${xml(media.name)}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${media.id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
 }
 
 function tableData(bundle: ProjectBundle): TableData[] {
@@ -102,62 +201,53 @@ function tableData(bundle: ProjectBundle): TableData[] {
   const grids = (axis: "X" | "Y") => {
     const lines = axis === "X" ? bundle.geometry.grid_x : bundle.geometry.grid_y;
     const spacings = spacingsFromOrdinates(lines.map(({ ordinate }) => ordinate));
-    return lines.map((line, index) => [line.label, fixed(line.ordinate, "m"), index ? fixed(spacings[index - 1], "m") : "—"]);
+    return lines.map((line, index) => [line.label, value(line.ordinate, "m"), index ? value(spacings[index - 1], "m") : "—"]);
   };
-  const traces = (items: { label: string; trace: { value: number; unit: string; formula: string; substitution: string; standard_ref: string } | null | undefined }[]) => items.map(({ label, trace }) => [label, trace ? fixed(trace.value, trace.unit === "dimensionless" ? "" : trace.unit) : "—", trace?.formula ?? "—", trace?.substitution ?? "—", trace?.standard_ref ?? "—"]);
-  return [
-    { id: "project-data", headers: ["Data", "Keterangan"], rows: [["Nama proyek", bundle.project.title], ["Lokasi", bundle.project.location], ["Fungsi", bundle.project.function], ["Pemilik", bundle.project.owner], ["Revisi", bundle.revision.revision_number]] },
-    { id: "grid-x", headers: ["Grid", "Ordinat", "Jarak Sebelumnya"], rows: grids("X") },
-    { id: "grid-y", headers: ["Grid", "Ordinat", "Jarak Sebelumnya"], rows: grids("Y") },
-    { id: "story-data", headers: ["Story", "Tinggi", "Elevasi"], rows: bundle.geometry.stories.map((story) => [story.name, fixed(story.height, "m"), fixed(story.elevation, "m")]) },
-    { id: "material-properties", headers: ["Material", "Mutu", "Nilai", "Provenance"], rows: [
-      ["Beton", bundle.materials.concrete.grade, fixed(bundle.materials.concrete.fc.value, "MPa"), bundle.materials.concrete.fc.provenance],
-      ["Modulus elastis beton", bundle.materials.concrete.grade, fixed(bundle.materials.concrete.elastic_modulus.value, "MPa"), bundle.materials.concrete.elastic_modulus.formula_id],
-      ["Berat jenis beton", bundle.materials.concrete.grade, fixed(bundle.materials.concrete.density.value, "kg/m³"), bundle.materials.concrete.density.provenance],
-      ["Selimut beton", bundle.materials.concrete.grade, fixed(bundle.materials.concrete.cover.value, "mm"), bundle.materials.concrete.cover.provenance],
-      ["Tulangan longitudinal", bundle.materials.longitudinal_rebar.grade, fixed(bundle.materials.longitudinal_rebar.fy.value, "MPa"), bundle.materials.longitudinal_rebar.fy.provenance],
-      ["Tulangan transversal", bundle.materials.transverse_rebar.grade, fixed(bundle.materials.transverse_rebar.fys.value, "MPa"), bundle.materials.transverse_rebar.fys.provenance],
+  const tables: TableData[] = [
+    { id: "project-data", headers: ["Data", "Keterangan"], rows: [["Nama bangunan", bundle.project.title], ["Lokasi", bundle.project.location], ["Fungsi bangunan", bundle.project.function], ["Pemilik", bundle.project.owner]] },
+    { id: "grid-x", headers: ["Grid", "Ordinat", "Jarak sebelumnya"], rows: grids("X") },
+    { id: "grid-y", headers: ["Grid", "Ordinat", "Jarak sebelumnya"], rows: grids("Y") },
+    { id: "story-data", headers: ["Story", "Tinggi", "Elevasi"], rows: bundle.geometry.stories.map((story) => [story.name, value(story.height, "m"), value(story.elevation, "m")]) },
+    { id: "material-properties", headers: ["Material", "Mutu", "Nilai", "Asal data"], rows: [
+      ["Beton", bundle.materials.concrete.grade, value(bundle.materials.concrete.fc.value, "MPa"), "Masukan"],
+      ["Modulus elastis beton", bundle.materials.concrete.grade, value(bundle.materials.concrete.elastic_modulus.value, "MPa"), "Perhitungan"],
+      ["Berat jenis beton", bundle.materials.concrete.grade, value(bundle.materials.concrete.density.value, "kg/m³"), "Masukan"],
+      ["Selimut beton", bundle.materials.concrete.grade, value(bundle.materials.concrete.cover.value, "mm"), "Masukan"],
+      ["Tulangan longitudinal", bundle.materials.longitudinal_rebar.grade, value(bundle.materials.longitudinal_rebar.fy.value, "MPa"), "Masukan"],
+      ["Tulangan transversal", bundle.materials.transverse_rebar.grade, value(bundle.materials.transverse_rebar.fys.value, "MPa"), "Masukan"],
     ] },
-    { id: "reinforcement-diameters", headers: ["ID", "Diameter Nominal", "Provenance"], rows: bundle.materials.available_diameters.map((item) => [item.id, fixed(item.nominal_diameter.value, "mm"), item.nominal_diameter.provenance]) },
-    { id: "load-summary", headers: ["Nama", "Kategori", "Nilai", "Sumber", "Asumsi", "Faktor W"], rows: handoff.patterns.map((load) => [load.name, load.categoryLabel, fixed(load.value, load.unit), load.source, load.assumption, load.seismic_weight_factor]) },
-    { id: "load-assignments", headers: ["Load", "Target", "Aplikasi", "Asumsi"], rows: handoff.assignments.map((assignment) => [assignment.definition?.name ?? assignment.load_id, assignment.target?.label ?? assignment.target_id, assignment.application, assignment.assumption]) },
-    { id: "seismic-input-provenance", headers: ["Parameter", "Nilai", "Sumber", "Penginput", "Revisi"], rows: (["site_class", "ss", "s1", "tl", "fa", "fv"] as const).map((key) => [key.toUpperCase(), key === "site_class" ? handoff.rawSeismic[key] : fixed(handoff.rawSeismic[key], key === "tl" ? "s" : key === "ss" || key === "s1" ? "g" : ""), handoff.inputProvenance[key].source, handoff.inputProvenance[key].entered_by, handoff.inputProvenance[key].project_revision]) },
-    { id: "seismic-spectrum", headers: ["Parameter", "Nilai", "Rumus", "Substitusi", "Referensi"], rows: result?.spectrum ? traces(Object.entries(result.spectrum).map(([label, trace]) => ({ label: label.toUpperCase(), trace }))) : [] },
-    { id: "seismic-kds", headers: ["Pemeriksaan", "Input", "Hasil", "Substitusi", "Referensi"], rows: result?.kds_review?.checks.map((check) => [check.label, fixed(check.input_value, check.input_unit), `KDS ${check.result}`, check.substitution, check.standard_ref]) ?? [] },
-    { id: "seismic-system", headers: ["Parameter", "Nilai", "Rumus / Klasifikasi", "Referensi"], rows: result?.system_parameters ? [
-      ["Sistem terpilih", handoff.selectedSystem?.label, result.system_parameters.period_classification.label, handoff.selectedSystem?.standard_ref],
-      ["R", fixed(result.system_parameters.R.value), result.system_parameters.R.formula, result.system_parameters.R.standard_ref],
-      ["Ω₀", fixed(result.system_parameters.omega0.value), result.system_parameters.omega0.formula, result.system_parameters.omega0.standard_ref],
-      ["Cd", fixed(result.system_parameters.Cd.value), result.system_parameters.Cd.formula, result.system_parameters.Cd.standard_ref],
-      ["Ct", fixed(result.system_parameters.Ct.value), result.system_parameters.Ct.formula, result.system_parameters.Ct.standard_ref],
-      ["x", fixed(result.system_parameters.x.value), result.system_parameters.x.formula, result.system_parameters.x.standard_ref],
-    ] : [] },
-    { id: "seismic-period", headers: ["Parameter", "Nilai", "Rumus", "Substitusi", "Referensi"], rows: result?.period ? traces([
-      { label: "Ta", trace: result.period.ta }, { label: "Cu", trace: result.period.cu }, { label: "CuTa / Tmax", trace: result.period.tmax }, { label: "T analitis", trace: result.period.analytical_period }, { label: "T digunakan", trace: result.period.used },
-    ]) : [] },
-    { id: "seismic-cs", headers: ["Parameter", "Nilai", "Rumus", "Substitusi", "Referensi"], rows: result?.response_coefficient ? traces([
-      { label: "Cs nominal", trace: result.response_coefficient.nominal }, { label: "Batas atas Cs", trace: result.response_coefficient.upper_bound },
-      ...result.response_coefficient.lower_bounds.map((trace, index) => ({ label: `Batas bawah Cs ${index + 1}`, trace })), { label: "Cs menentukan", trace: result.response_coefficient.governing },
-    ]) : [] },
-    { id: "seismic-weight", headers: ["Story", "Berat Seismik"], rows: result ? handoff.stories.filter(({ order }) => order > 0).map((story) => [story.name, fixed(result.story_forces.find(({ story: name }) => name === story.name)?.weight, "kN")]) : [] },
-    { id: "seismic-base-shear", headers: ["Hasil", "Nilai", "Rumus", "Substitusi", "Referensi"], rows: result ? [
-      ["Berat seismik efektif, W", fixed(result.seismic_weight?.value, "kN"), result.seismic_weight?.formula, result.seismic_weight?.substitution, result.seismic_weight?.standard_ref],
-      ["Koefisien respons, Cs", fixed(result.response_coefficient?.governing.value), result.response_coefficient?.governing.formula, result.response_coefficient?.governing.substitution, result.response_coefficient?.governing.standard_ref],
-      ["Gaya geser dasar, V", fixed(result.base_shear?.value, "kN"), result.base_shear?.formula, result.base_shear?.substitution, result.base_shear?.standard_ref],
-      ["Eksponen distribusi, k", fixed(result.story_exponent?.value), result.story_exponent?.formula, result.story_exponent?.substitution, result.story_exponent?.standard_ref],
-    ] : [] },
-    { id: "story-forces", headers: ["Story", "Elevasi", "W", "Cvx", "Fx", "Referensi"], rows: result?.story_forces.map((row) => [row.story, fixed(row.elevation, "m"), fixed(row.weight, "kN"), fixed(row.cvx.value), fixed(row.force.value, "kN"), row.force.standard_ref]) ?? [] },
-    { id: "etabs-patterns", headers: ["Nama", "Kategori", "Nilai", "Assignment"], rows: handoff.patterns.map((item) => [item.name, item.categoryLabel, fixed(item.value, item.unit), item.assignmentCount]) },
-    { id: "etabs-cases", headers: ["Nama", "Kategori", "Sumber", "Status Setup"], rows: handoff.loadCases.map((item) => [item.name, item.category, item.source, "Ditetapkan dan diverifikasi di ETABS"]) },
-    { id: "load-combinations", headers: ["ID", "Kombinasi", "Referensi"], rows: handoff.combinations.length ? handoff.combinations.map((item) => [item.id, item.expression, item.standard_ref]) : [["REFERENCE", "Belum dimuat dari registry aktif", handoff.combinationNote]] },
-    { id: "etabs-readiness", headers: ["Item", "Status", "Klasifikasi", "Keterangan"], rows: handoff.readiness.map((item) => [item.label, item.status, item.classification, item.detail]) },
+    { id: "reinforcement-diameters", headers: ["Diameter tulangan tersedia"], rows: bundle.materials.available_diameters.map((item) => [value(item.nominal_diameter.value, "mm", 0)]) },
+    { id: "load-summary", headers: ["Nama beban", "Kategori", "Nilai", "Sumber", "Asumsi", "Faktor berat seismik"], rows: handoff.patterns.map((load) => [load.name, load.categoryLabel, value(load.value, load.unit), load.source, load.assumption, number(load.seismic_weight_factor)]) },
+    { id: "load-assignments", headers: ["Beban", "Target", "Aplikasi", "Asumsi"], rows: handoff.assignments.map((assignment) => [assignment.definition?.name ?? assignment.load_id, assignment.target?.label ?? assignment.target_id, assignment.application === "UNIFORM_AREA" ? "Beban merata area" : "Beban merata garis", assignment.assumption]) },
+    { id: "seismic-input-provenance", headers: ["Parameter", "Nilai", "Sumber"], rows: (["site_class", "ss", "s1", "tl", "fa", "fv"] as const).map((key) => [key === "site_class" ? "Kelas situs" : key.toUpperCase(), key === "site_class" ? handoff.rawSeismic[key] : value(handoff.rawSeismic[key], key === "tl" ? "detik" : key === "ss" || key === "s1" ? "g" : ""), handoff.inputProvenance[key].source]) },
+    { id: "seismic-spectrum", headers: ["Parameter", "Nilai", "Referensi"], rows: result?.spectrum ? Object.entries(result.spectrum).map(([label, trace]) => [label.toUpperCase(), value(trace.value, trace.unit === "dimensionless" ? "" : trace.unit), trace.standard_ref]) : [] },
+    { id: "seismic-kds", headers: ["Pemeriksaan", "Input", "Hasil", "Referensi"], rows: result?.kds_review?.checks.map((check) => [check.label, value(check.input_value, check.input_unit), `KDS ${check.result}`, check.standard_ref]) ?? [] },
+    { id: "seismic-system", headers: ["Parameter", "Nilai", "Keterangan"], rows: result?.system_parameters ? [["Sistem struktur", handoff.selectedSystem?.label, handoff.selectedSystem?.standard_ref], ["R", number(result.system_parameters.R.value), "Koefisien modifikasi respons"], ["Ω₀", number(result.system_parameters.omega0.value), "Faktor kuat lebih"], ["Cd", number(result.system_parameters.Cd.value), "Faktor pembesaran defleksi"], ["Ct", number(result.system_parameters.Ct.value, 4), "Koefisien periode"], ["x", number(result.system_parameters.x.value), "Eksponen periode"]] : [] },
+    { id: "seismic-period", headers: ["Parameter", "Nilai", "Referensi"], rows: result?.period ? [["Ta", value(result.period.ta.value, "detik", 4), result.period.ta.standard_ref], ["Cu", number(result.period.cu.value), result.period.cu.standard_ref], ["T maksimum", value(result.period.tmax.value, "detik", 4), result.period.tmax.standard_ref], ["T digunakan", value(result.period.used.value, "detik", 4), result.period.used.standard_ref]] : [] },
+    { id: "seismic-cs", headers: ["Pemeriksaan", "Nilai", "Referensi"], rows: result?.response_coefficient ? [["Cs nominal", number(result.response_coefficient.nominal.value, 4), result.response_coefficient.nominal.standard_ref], ["Batas atas", number(result.response_coefficient.upper_bound.value, 4), result.response_coefficient.upper_bound.standard_ref], ...result.response_coefficient.lower_bounds.map((trace, index) => [`Batas bawah ${index + 1}`, number(trace.value, 4), trace.standard_ref]), ["Cs digunakan", number(result.response_coefficient.governing.value, 4), result.response_coefficient.governing.standard_ref]] : [] },
+    { id: "seismic-weight", headers: ["Story", "Berat seismik"], rows: result?.story_forces.map((row) => [row.story, value(row.weight, "kN")]) ?? [] },
+    { id: "seismic-base-shear", headers: ["Hasil", "Nilai", "Referensi"], rows: result ? [["Berat seismik efektif, W", value(result.seismic_weight?.value, "kN"), result.seismic_weight?.standard_ref], ["Koefisien respons, Cs", number(result.response_coefficient?.governing.value, 4), result.response_coefficient?.governing.standard_ref], ["Gaya geser dasar, V", value(result.base_shear?.value, "kN"), result.base_shear?.standard_ref], ["Eksponen distribusi, k", number(result.story_exponent?.value), result.story_exponent?.standard_ref]] : [] },
+    { id: "story-forces", headers: ["Story", "Elevasi", "W", "Cvx", "Fx"], rows: result?.story_forces.map((row) => [row.story, value(row.elevation, "m"), value(row.weight, "kN"), number(row.cvx.value, 4), value(row.force.value, "kN")]) ?? [] },
+    { id: "etabs-patterns", headers: ["Nama", "Kategori", "Nilai", "Jumlah assignment"], rows: handoff.patterns.map((item) => [item.name, item.categoryLabel, value(item.value, item.unit), item.assignmentCount]) },
+    { id: "etabs-cases", headers: ["Nama", "Kategori", "Keterangan"], rows: handoff.loadCases.map((item) => [item.name, item.category, "Ditetapkan dan diverifikasi pada model ETABS"]) },
+    { id: "etabs-readiness", headers: ["Item", "Status", "Keterangan"], rows: handoff.readiness.map((item) => [item.label, item.status === "READY" ? "Siap" : "Perlu tinjau", item.detail.replace(/M[3-7]/g, "tahap sebelumnya").replace(/registry/gi, "referensi")]) },
   ];
+  return tables.map((table) => ({ ...table, rows: table.rows.map((row) => row.map((cell) => typeof cell === "string" ? reportText(cell) : cell)) }));
 }
 
 function pngChunk(type: string, data: Uint8Array) {
   const kind = encoder.encode(type);
   return join([integer(data.length, 4, false), kind, data, integer(crc32(join([kind, data])), 4, false)]);
 }
+
+const glyphs: Record<string, string[]> = {
+  "0": ["111", "101", "101", "101", "111"], "1": ["010", "110", "010", "010", "111"], "2": ["111", "001", "111", "100", "111"], "3": ["111", "001", "111", "001", "111"],
+  "4": ["101", "101", "111", "001", "001"], "5": ["111", "100", "111", "001", "111"], "6": ["111", "100", "111", "101", "111"], "7": ["111", "001", "010", "010", "010"],
+  "8": ["111", "101", "111", "101", "111"], "9": ["111", "101", "111", "001", "111"], "A": ["010", "101", "111", "101", "101"], "D": ["110", "101", "101", "101", "110"],
+  "E": ["111", "100", "110", "100", "111"], "G": ["111", "100", "101", "101", "111"], "I": ["111", "010", "010", "010", "111"], "K": ["101", "101", "110", "101", "101"],
+  "L": ["100", "100", "100", "100", "111"], "S": ["111", "100", "111", "001", "111"], "T": ["111", "010", "010", "010", "010"], "(": ["01", "10", "10", "10", "01"],
+  ")": ["10", "01", "01", "01", "10"], ".": ["0", "0", "0", "0", "1"], ",": ["0", "0", "0", "1", "1"], " ": ["0", "0", "0", "0", "0"],
+};
 
 function renderSystemFigure(figureId: string, bundle: ProjectBundle) {
   const width = 1000;
@@ -168,7 +258,7 @@ function renderSystemFigure(figureId: string, bundle: ProjectBundle) {
     const index = (Math.round(y) * width + Math.round(x)) * 4;
     [pixels[index], pixels[index + 1], pixels[index + 2], pixels[index + 3]] = [...color, 255];
   };
-  const line = (x0: number, y0: number, x1: number, y1: number, color: [number, number, number] = [15, 104, 123], thickness = 2) => {
+  const line = (x0: number, y0: number, x1: number, y1: number, color: [number, number, number] = [13, 119, 143], thickness = 2) => {
     const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
     for (let step = 0; step <= steps; step += 1) {
       const x = x0 + (x1 - x0) * step / steps;
@@ -176,10 +266,18 @@ function renderSystemFigure(figureId: string, bundle: ProjectBundle) {
       for (let dx = -thickness; dx <= thickness; dx += 1) for (let dy = -thickness; dy <= thickness; dy += 1) set(x + dx, y + dy, color);
     }
   };
+  const text = (label: string, x: number, y: number, scale = 3) => {
+    let cursor = x;
+    for (const raw of label.toUpperCase()) {
+      const glyph = glyphs[raw] ?? glyphs[" "];
+      glyph.forEach((row, rowIndex) => [...row].forEach((pixel, column) => { if (pixel === "1") for (let dx = 0; dx < scale; dx += 1) for (let dy = 0; dy < scale; dy += 1) set(cursor + column * scale + dx, y + rowIndex * scale + dy, [45, 55, 52]); }));
+      cursor += (glyph[0].length + 1) * scale;
+    }
+  };
   const normalized = (values: number[], start: number, size: number) => {
     const min = Math.min(...values);
     const span = Math.max(Math.max(...values) - min, 1);
-    return values.map((value) => start + (value - min) / span * size);
+    return values.map((item) => start + (item - min) / span * size);
   };
   if (figureId === "plan-grid") {
     for (const x of normalized(bundle.geometry.grid_x.map(({ ordinate }) => ordinate), 130, 740)) line(x, 70, x, 530);
@@ -193,15 +291,23 @@ function renderSystemFigure(figureId: string, bundle: ProjectBundle) {
     for (const y of levels) { line(270, y, 650, y); line(650, y, 790, y - 80); line(790, y - 80, 410, y - 80); line(410, y - 80, 270, y); }
     for (const [x, offset] of [[270, 0], [650, 0], [790, -80], [410, -80]] as const) line(x, levels[0] + offset, x, levels.at(-1)! + offset);
   } else {
-    const points = createEtabsHandoff(bundle).spectrum;
-    line(100, 60, 100, 520, [30, 30, 30]); line(100, 520, 920, 520, [30, 30, 30]);
+    const handoff = createEtabsHandoff(bundle);
+    const points = handoff.spectrum;
+    line(105, 55, 105, 515, [45, 55, 52]); line(105, 515, 920, 515, [45, 55, 52]);
+    text("SA (G)", 20, 25); text("T (DETIK)", 780, 550);
     if (points.length) {
       const maxX = Math.max(...points.map(({ period }) => period), 1);
       const maxY = Math.max(...points.map(({ acceleration }) => acceleration.value), 1);
       points.slice(1).forEach((point, index) => {
         const previous = points[index];
-        line(100 + previous.period / maxX * 820, 520 - previous.acceleration.value / maxY * 420, 100 + point.period / maxX * 820, 520 - point.acceleration.value / maxY * 420, [15, 104, 123]);
+        line(105 + previous.period / maxX * 815, 515 - previous.acceleration.value / maxY * 420, 105 + point.period / maxX * 815, 515 - point.acceleration.value / maxY * 420);
       });
+      const spectrum = handoff.result?.spectrum;
+      for (const [label, period] of [["T0", spectrum?.t0.value], ["TS", spectrum?.ts.value], ["TL", handoff.rawSeismic.tl]] as const) {
+        if (period === null || period === undefined || period > maxX) continue;
+        const x = 105 + period / maxX * 815;
+        line(x, 75, x, 515, [155, 165, 161], 1); text(label, x - 8, 525, 2);
+      }
     }
   }
   const raw = new Uint8Array((width * 4 + 1) * height);
@@ -220,10 +326,10 @@ function mediaFor(input: ReportGenerationInput) {
     if (!asset && !figure.system_image_source) continue;
     const match = asset?.data_url.match(/^data:(image\/(?:png|jpeg));base64,(.+)$/);
     if (asset && !match) continue;
-    const contentType = match?.[1] ?? "image/png";
+    const contentType = (match?.[1] ?? "image/png") as Media["contentType"];
     const data = match ? Uint8Array.from(Buffer.from(match[2], "base64")) : renderSystemFigure(figure.figure_id, input.bundle);
     const index = media.length + 1;
-    media.push({ figure, media: { id: `rIdImage${index}`, name: `figure-${index}.${contentType === "image/jpeg" ? "jpg" : "png"}`, contentType, data } });
+    media.push({ figure, media: { id: `rIdStruCalImage${index}`, name: `strucal-figure-${index}.${contentType === "image/jpeg" ? "jpg" : "png"}`, contentType, data } });
   }
   return media;
 }
@@ -231,135 +337,169 @@ function mediaFor(input: ReportGenerationInput) {
 export function generateReportDocx(input: ReportGenerationInput) {
   const { bundle, snapshot } = input;
   const handoff = createEtabsHandoff(bundle);
-  if (handoff.status !== "READY") throw new Error("M7 readiness harus READY sebelum Generate #1.");
+  if (handoff.status !== "READY") throw new Error("Kesiapan handoff ETABS harus READY sebelum DOCX dibuat.");
   if (snapshot.project_revision !== bundle.revision.id) throw new Error("Snapshot tidak sesuai dengan revisi proyek aktif.");
-  const tables = new Map(tableData(bundle).map((entry) => [entry.id, entry]));
+
+  const masterBytes = readFileSync(masterPath());
+  const files = readZip(masterBytes);
+  const originalDocument = decoder.decode(files.get("word/document.xml"));
+  const body = splitBody(originalDocument);
+  const sourceBodyStart = findBlock(body.children, REPORT_TEMPLATE_MANIFEST.body_anchor.text, REPORT_TEMPLATE_MANIFEST.body_anchor.style);
+  const sourceStop = findBlock(body.children, REPORT_TEMPLATE_MANIFEST.stop_anchor.text, REPORT_TEMPLATE_MANIFEST.stop_anchor.style);
+  if (sourceStop <= sourceBodyStart) throw new Error("Batas Stage 1 pada master DOCX tidak valid.");
+  const coverSection = sectionParagraph(body.children[0]);
+  const frontSection = sectionParagraph(body.children[sourceBodyStart - 1]);
+  const finalSection = [...body.children].reverse().find((child) => child.startsWith("<w:sectPr"));
+  if (!frontSection?.includes("<w:sectPr") || !finalSection) throw new Error("Section break master DOCX tidak lengkap.");
+
+  const standardCaption = findBlock(body.children, REPORT_TEMPLATE_MANIFEST.table_exemplars.standard);
+  const standardTable = nextTable(body.children, standardCaption);
+  const combinationIntro = findBlock(body.children, REPORT_TEMPLATE_MANIFEST.table_exemplars.combinations);
+  const combinationTable = nextTable(body.children, combinationIntro);
+  if (!standardTable || !combinationTable || !textOf(combinationTable).includes("COMB 28")) throw new Error("Tabel master untuk data dinamis atau COMB 1–28 tidak tersedia.");
+
+  const tableMap = new Map(tableData(bundle).map((entry) => [entry.id, entry]));
+  const tableMeta = new Map(snapshot.tables.map((entry) => [entry.table_id, entry]));
   const media = mediaFor(input);
   const figures = new Map(media.map((entry) => [entry.figure.figure_id, entry]));
-  const tableMeta = new Map(snapshot.tables.map((entry) => [entry.table_id, entry]));
   const figureMeta = new Map(snapshot.figures.map((entry) => [entry.figure_id, entry]));
+  const figureTemplates = new Map(Object.entries(REPORT_TEMPLATE_MANIFEST.figures).map(([id, map]) => {
+    const captionIndex = findBlock(body.children, map.source_caption);
+    const pictureBlock = body.children.slice(Math.max(0, captionIndex - 5), captionIndex).reverse().find((child) => child.includes("<w:drawing"));
+    return [id, pictureBlock];
+  }));
   const blocks: string[] = [];
-  const addTable = (id: string) => { const data = tables.get(id); const meta = tableMeta.get(id); if (data && meta) blocks.push(caption("Tabel", meta.effective_caption), table(data), paragraph("", "Normal", { firstLine: false })); };
-  const addFigure = (id: string, showPlaceholder = false) => { const entry = figures.get(id); const meta = figureMeta.get(id); if (!meta) return; if (entry) blocks.push(picture(entry.media, meta.effective_caption, media.indexOf(entry) + 1), caption("Gambar", meta.effective_caption)); else if (showPlaceholder) blocks.push(placeholder(meta.effective_caption), paragraph("", "Normal", { firstLine: false })); };
-  const chapter = (number: string, title: string) => blocks.push(paragraph(`BAB ${number}`, "Heading1", { pageBreakBefore: true, align: "center" }), paragraph(title, "ChapterTitle", { align: "center", keepNext: true }));
-  const section = (number: string, title: string) => blocks.push(paragraph(`${number}.    ${title}`, "Heading2"));
-  const subsection = (number: string, title: string) => blocks.push(paragraph(`${number}.    ${title}`, "Heading3"));
-  const body = (text: string) => blocks.push(paragraph(text, "Normal", { align: "both" }));
-  const loadText = (category: LoadCategory, label: string) => {
-    const items = bundle.loads.definitions.filter((item) => item.category === category);
-    body(items.length ? `${label} pada model aktif terdiri dari ${items.map((item) => `${item.name} sebesar ${fixed(item.value, item.unit)}, bersumber dari ${item.source}, dengan asumsi ${item.assumption}`).join("; ")}. Nilai tersebut diterapkan melalui assignment yang tercatat pada tabel pembebanan.` : `${label} belum tersedia pada revisi proyek aktif.`);
+  const addTable = (id: string) => { const data = tableMap.get(id); const meta = tableMeta.get(id); if (data && meta) blocks.push(caption("Tabel", meta.effective_caption), sourceTable(data, standardTable), paragraph("", "3Normal", { firstLine: false })); };
+  const addFigure = (id: string) => { const entry = figures.get(id); const meta = figureMeta.get(id); if (!entry || !meta) return; blocks.push(picture(entry.media, meta.effective_caption, media.indexOf(entry) + 1, figureTemplates.get(id)), caption("Gambar", meta.effective_caption)); };
+  const chapter = (roman: string, title: string) => blocks.push(paragraph(`BAB ${roman}\n${title}`, "1BAB", { pageBreakBefore: true, align: "center", firstLine: false }));
+  const section = (numbering: string, title: string) => blocks.push(paragraph(`${numbering}.\t${title}`, numbering.split(".").length > 2 ? "3SUB-BAB" : "2SUB-BAB", { firstLine: false }));
+  const narrative = (content: string) => blocks.push(paragraph(content, "3Normal", { align: "both" }));
+  const loadNarrative = (category: LoadCategory, title: string) => {
+    const loads = bundle.loads.definitions.filter((item) => item.category === category);
+    narrative(loads.length ? `${title} yang digunakan terdiri atas ${loads.map((item) => `${reportText(item.name)} sebesar ${value(item.value, item.unit)}, berdasarkan ${reportText(item.source)}, dengan asumsi ${reportText(item.assumption)}`).join("; ")}. Beban diterapkan pada elemen sesuai target assignment yang telah ditetapkan.` : `${title} tidak digunakan pada bangunan ini.`);
   };
 
-  blocks.push(paragraph(String(new Date(snapshot.generated_at).getFullYear()), "CoverYear", { align: "right", firstLine: false }), paragraph("LAPORAN\nPERHITUNGAN", "CoverTitle", { align: "left", firstLine: false }), paragraph("ANALISIS DAN PERENCANAAN\nSTRUKTUR BETON BERTULANG", "CoverSubtitle", { align: "left", firstLine: false }), paragraph(bundle.project.title.toUpperCase(), "CoverProject", { align: "left", firstLine: false }), paragraph(`${bundle.project.location || "LOKASI PROYEK"} · ${bundle.project.owner || "PEMILIK PROYEK"}`, "CoverBand", { align: "left", firstLine: false }));
+  const cover = [
+    coverParagraph(String(new Date(snapshot.generated_at).getFullYear()), 18, { align: "right", after: 900 }),
+    coverParagraph("LAPORAN\nPERHITUNGAN", 42, { bold: true, after: 180 }),
+    coverParagraph("ANALISIS DAN PERENCANAAN\nSTRUKTUR BETON BERTULANG", 24, { bold: true, after: 180 }),
+    coverParagraph(bundle.project.title.toUpperCase(), 24, { bold: true, after: 180 }),
+    coverParagraph(`${bundle.project.location || "LOKASI PROYEK"} · ${bundle.project.owner || "PEMILIK PROYEK"}`, 18, { bold: true, fill: "146B7D", after: 480 }),
+  ];
   const coverModel = figures.get("model-3d");
-  if (coverModel) blocks.push(picture(coverModel.media, "Model struktur", media.indexOf(coverModel) + 100, 4937760, 2962656));
-  blocks.push(sectionBreak("none", true));
-  blocks.push(paragraph("DAFTAR ISI", "FrontHeading", { align: "center", firstLine: false }), fieldParagraph('TOC \\o "1-3" \\h \\z \\u', "Perbarui field untuk menampilkan daftar isi."));
-  blocks.push(paragraph("DAFTAR GAMBAR", "FrontHeading", { pageBreakBefore: true, align: "center", firstLine: false }), fieldParagraph('TOC \\h \\z \\c "Gambar"', "Perbarui field untuk menampilkan daftar gambar."));
-  blocks.push(paragraph("DAFTAR TABEL", "FrontHeading", { pageBreakBefore: true, align: "center", firstLine: false }), fieldParagraph('TOC \\h \\z \\c "Tabel"', "Perbarui field untuk menampilkan daftar tabel."), sectionBreak("lowerRoman"));
+  if (coverModel) cover.push(picture(coverModel.media, "Model struktur", 100));
+  cover.push(coverSection);
+  const frontMatter = [
+    paragraph("DAFTAR ISI", "1BAB", { align: "center", firstLine: false }), fieldParagraph('TOC \\o "1-3" \\h \\z \\u'),
+    paragraph("DAFTAR GAMBAR", "1BAB", { pageBreakBefore: true, align: "center", firstLine: false }), fieldParagraph('TOC \\h \\z \\c "Gambar"'),
+    paragraph("DAFTAR TABEL", "1BAB", { pageBreakBefore: true, align: "center", firstLine: false }), fieldParagraph('TOC \\h \\z \\c "Tabel"'),
+  ];
 
   chapter("I", "PENDAHULUAN");
   section("1.1", "Data Perencanaan");
-  body(`Laporan ini disusun sebagai dokumen perhitungan tahap pra-analisis untuk ${bundle.project.title}. Data perencanaan mencakup geometri bangunan, material beton bertulang, pembebanan gravitasi dan lingkungan, perhitungan gempa statik ekivalen, serta paket data yang diperlukan untuk membentuk dan memeriksa model ETABS.`);
-  body("Setiap angka yang disajikan berasal dari revisi proyek aktif. Hasil analisis struktur, gaya dalam elemen, reaksi tumpuan, simpangan, desain penampang, dan output ETABS tidak termasuk dalam Generate #1 karena memerlukan model analisis yang telah dibangun dan diverifikasi oleh engineer.");
+  narrative(`Laporan ini disusun untuk memberikan penjelasan teknis mengenai perencanaan struktur beton bertulang ${bundle.project.title}. Lingkup perencanaan meliputi data bangunan, geometri, material, pembebanan, ketahanan gempa, serta penyiapan data untuk pemodelan struktur.`);
+  narrative("Perhitungan pada dokumen ini merupakan tahap pra-analisis. Analisis respons struktur, gaya dalam elemen, reaksi tumpuan, simpangan, dan desain penampang dilakukan setelah model analisis selesai dibentuk serta diverifikasi.");
   section("1.2", "Data Bangunan"); addTable("project-data");
-  subsection("1.2.1", "Data Struktur");
-  body(`Bangunan dimodelkan sebagai struktur beton bertulang dengan ${bundle.geometry.stories.filter(({ order }) => order > 0).length} tingkat di atas level dasar. Rentang grid X dan Y serta elevasi tingkat menjadi acuan tunggal untuk denah, estimasi area pembebanan, distribusi berat seismik, dan handoff ke ETABS.`);
+  section("1.2.1", "Data Struktur");
+  narrative(`Bangunan direncanakan menggunakan sistem struktur beton bertulang dengan ${bundle.geometry.stories.filter(({ order }) => order > 0).length} tingkat di atas level dasar. Grid dan elevasi berikut menjadi acuan geometri model struktur.`);
   addTable("grid-x"); addTable("grid-y"); addTable("story-data");
-  subsection("1.2.2", "Gambar Rencana");
-  body("Gambar rencana berikut dibentuk langsung dari ordinat grid dan data tingkat pada revisi aktif. Gambar ini berfungsi sebagai kontrol geometri awal dan tidak menggantikan gambar kerja atau model ETABS.");
+  section("1.2.2", "Gambar Rencana");
+  narrative("Denah grid, elevasi tingkat, dan perspektif tiga dimensi berikut disusun dari data geometri bangunan. Gambar berfungsi sebagai kontrol awal sebelum pemodelan rinci dilakukan.");
   addFigure("plan-grid"); addFigure("story-elevation"); addFigure("model-3d");
   section("1.3", "Diagram Alir Perencanaan");
-  body("Alur kerja Generate #1 dimulai dari data proyek dan geometri, dilanjutkan dengan penetapan material, definisi serta assignment beban, perhitungan gempa, pemeriksaan kesiapan handoff, lalu penyusunan dokumen. Model ETABS dibangun setelah data pra-analisis dinyatakan siap. Hasil analisis ETABS menjadi tahap lanjutan di luar batas dokumen ini.");
-  blocks.push(table({ id: "workflow", headers: ["Urutan", "Tahap", "Keluaran"], rows: [[1, "Data proyek dan geometri", "Grid, story, elevasi"], [2, "Material", "fc′, fy, fys, berat jenis, selimut"], [3, "Pembebanan", "Definisi, assignment, berat seismik"], [4, "Gempa", "Spektrum, KDS, sistem, Cs, V, Fx"], [5, "Handoff ETABS", "Grid, load pattern, case, kombinasi, checklist"]] }));
+  narrative("Tahapan perencanaan mencakup pengumpulan data, penetapan geometri dan material, penyusunan pembebanan dan ketahanan gempa, serta penyiapan model ETABS untuk diperiksa sebelum analisis.");
+  blocks.push(sourceTable({ id: "workflow", headers: ["Urutan", "Tahap", "Keluaran"], rows: [[1, "Data bangunan", "Fungsi, lokasi, geometri"], [2, "Material", "Beton dan tulangan"], [3, "Pembebanan", "Beban dan assignment"], [4, "Ketahanan gempa", "Spektrum, KDS, Cs, V, Fx"], [5, "Pemodelan ETABS", "Grid, story, load case, kombinasi"]] }, standardTable));
   section("1.4", "Dasar-Dasar Perencanaan");
-  body("Perencanaan menggunakan pendekatan keadaan batas dengan pemisahan antara data input, nilai yang dihitung oleh registry, dan keputusan yang tetap harus diverifikasi oleh engineer. Semua nilai turunan penting disertai rumus, substitusi, referensi, versi registry, dan revisi proyek agar jejak perhitungan dapat diaudit.");
-  subsection("1.4.1", "Peraturan yang Digunakan");
-  body(`Registry standar aktif adalah ${bundle.revision.registry_version.replaceAll("|", ", ")}. Standar tersebut menjadi dasar untuk ketentuan beton struktural, pembebanan minimum, dan tata cara perencanaan ketahanan gempa yang digunakan oleh modul perhitungan proyek.`);
+  narrative("Perencanaan memenuhi persyaratan kekuatan, kemampuan layan, stabilitas, daktilitas, dan durabilitas. Nilai input serta hasil perhitungan disajikan agar dapat ditelusuri.");
+  section("1.4.1", "Peraturan yang Digunakan");
+  narrative("Perencanaan mengacu pada SNI 2847:2019 untuk beton struktural, SNI 1727:2020 untuk beban desain minimum, serta SNI 1726:2019 untuk ketahanan gempa.");
 
   chapter("II", "MATERIAL DAN PEMBEBANAN");
   section("2.1", "Konsep Perancangan Struktur Beton Bertulang");
-  body("Sistem beton bertulang memanfaatkan beton untuk menahan gaya tekan dan tulangan baja untuk menahan gaya tarik serta meningkatkan daktilitas elemen. Mutu material, selimut, dan pilihan diameter tulangan harus konsisten dengan kebutuhan kekuatan, layan, durabilitas, detailing, serta kondisi pelaksanaan proyek.");
-  body("Pada tahap ini StruCal menyusun data material dan beban sebagai dasar model. Dimensi penampang dan detailing elemen belum tersedia pada model proyek, sehingga pemilihan penampang, kekakuan efektif, modifier, dan assignment elemen harus ditetapkan serta diperiksa pada ETABS sebelum analisis dijalankan.");
-  section("2.2", "Material Properties");
-  body("Properti material pada tabel berikut berasal dari modul material proyek aktif. Provenance INPUT menunjukkan nilai yang dimasukkan pengguna, sedangkan CODE menunjukkan nilai turunan berdasarkan registry aktif.");
-  addTable("material-properties"); addTable("reinforcement-diameters");
+  narrative("Struktur beton bertulang memanfaatkan beton untuk menahan gaya tekan dan tulangan baja untuk menahan gaya tarik. Sistem struktur dipilih agar memiliki kekuatan, kekakuan, dan daktilitas yang memadai terhadap beban gravitasi maupun beban lateral.");
+  narrative("Mutu beton, mutu tulangan, selimut, serta pilihan diameter tulangan ditetapkan sebagai dasar perencanaan elemen. Dimensi dan detailing akhir elemen ditentukan setelah hasil analisis struktur tersedia.");
+  section("2.2", "Material Properties"); addTable("material-properties"); addTable("reinforcement-diameters");
   section("2.3", "Pembebanan");
-  body("Pembebanan disusun menurut fungsi bangunan dan target geometri. Besaran beban, sumber, asumsi, bentuk aplikasi, serta faktor kontribusi terhadap berat seismik disimpan bersama sehingga penerapannya dapat ditelusuri saat model ETABS dibentuk.");
+  narrative("Pembebanan struktur ditetapkan berdasarkan fungsi bangunan dan ketentuan yang berlaku. Setiap beban memiliki besaran, sumber, asumsi, bentuk aplikasi, dan target penerapan yang digunakan sebagai dasar pemodelan.");
   addTable("load-summary"); addTable("load-assignments");
-  subsection("2.3.1", "Beban Mati"); loadText("SELF_WEIGHT", "Beban mati sendiri"); loadText("SUPERIMPOSED_DEAD", "Beban mati tambahan");
-  subsection("2.3.2", "Beban Hidup"); loadText("LIVE", "Beban hidup lantai");
-  subsection("2.3.3", "Beban Angin"); loadText("WIND", "Beban angin");
-  subsection("2.3.4", "Beban Hidup Atap"); loadText("ROOF_LIVE", "Beban hidup atap");
-  subsection("2.3.5", "Beban Hujan"); loadText("RAIN", "Beban hujan");
-  subsection("2.3.6", "Beban Gempa Pra-Analisis");
-  body("Perhitungan beban gempa menggunakan metode statik ekivalen dan spektrum respons desain berdasarkan SNI 1726:2019. Urutan perhitungan meliputi verifikasi input dan provenance, pembentukan parameter spektrum, penetapan Kategori Desain Seismik, pemilihan sistem struktur, pembatasan periode, penentuan koefisien respons, perhitungan gaya geser dasar, dan distribusi gaya lateral per tingkat.");
-  body("Input peta gempa, kelas situs, serta koefisien situs tidak diambil secara otomatis tanpa sumber. Tabel berikut mempertahankan sumber, penginput, dan revisi untuk setiap parameter sehingga penggunaan nilai dapat ditelusuri kembali.");
+  section("2.3.1", "Beban Mati"); loadNarrative("SELF_WEIGHT", "Beban mati sendiri"); loadNarrative("SUPERIMPOSED_DEAD", "Beban mati tambahan");
+  section("2.3.2", "Beban Hidup"); loadNarrative("LIVE", "Beban hidup");
+  section("2.3.3", "Beban Angin"); loadNarrative("WIND", "Beban angin");
+  section("2.3.4", "Beban Hidup Atap"); loadNarrative("ROOF_LIVE", "Beban hidup atap");
+  section("2.3.5", "Beban Hujan"); loadNarrative("RAIN", "Beban hujan");
+  section("2.3.6", "Beban Gempa");
+  narrative("Beban gempa ditentukan dengan metode statik ekivalen dan spektrum respons desain sesuai SNI 1726:2019. Tahapan perhitungan meliputi penetapan parameter gempa, pembentukan spektrum desain, penentuan Kategori Desain Seismik, pemilihan sistem struktur, periode fundamental, koefisien respons seismik, gaya geser dasar, dan distribusi gaya lateral per tingkat.");
   addTable("seismic-input-provenance");
-  subsection("2.3.6.1", "Parameter Spektrum Respons Desain");
-  body("Nilai SMS dan SM1 diperoleh dari parameter percepatan spektral yang telah dikoreksi koefisien situs. Nilai SDS dan SD1 kemudian digunakan untuk membentuk titik transisi T0 dan Ts serta ordinat spektrum respons desain.");
-  addTable("seismic-spectrum"); addFigure("response-spectrum");
-  subsection("2.3.6.2", "Kategori Desain Seismik");
-  body(`Kategori risiko bangunan ditetapkan sebagai ${handoff.rawSeismic.risk_category}. Kategori Desain Seismik ditentukan dari pemeriksaan SDS dan SD1; hasil yang lebih berat menjadi kategori pengendali.`);
-  addTable("seismic-kds");
-  subsection("2.3.6.3", "Sistem Struktur dan Parameter Desain");
-  body(`Sistem struktur yang dipilih adalah ${handoff.selectedSystem?.label ?? "—"}. Kelayakannya telah diperiksa terhadap Kategori Desain Seismik dan batas yang tersedia pada registry. Parameter R, Ω₀, dan Cd digunakan sebagai masukan perhitungan gaya gempa serta kontrol respons.`);
-  addTable("seismic-system");
-  subsection("2.3.6.4", "Periode Fundamental Struktur");
-  body("Periode pendekatan Ta dihitung dari tinggi struktur dan parameter sistem. Periode yang digunakan dibatasi oleh CuTa sesuai ketentuan registry; jika periode analitis belum tersedia, perhitungan pra-analisis menggunakan periode pendekatan yang tercatat.");
-  addTable("seismic-period");
-  subsection("2.3.6.5", "Koefisien Respons dan Gaya Geser Dasar");
-  body("Koefisien respons seismik nominal diperiksa terhadap batas atas dan batas bawah. Nilai yang mengendalikan dikalikan dengan berat seismik efektif untuk memperoleh gaya geser dasar statik ekivalen.");
-  addTable("seismic-cs"); addTable("seismic-weight"); addTable("seismic-base-shear");
-  subsection("2.3.6.6", "Distribusi Gaya Lateral per Tingkat");
-  body("Gaya geser dasar didistribusikan ke setiap tingkat berdasarkan berat tingkat, elevasi terhadap dasar, dan eksponen distribusi k. Jumlah Cvx harus sama dengan 1,0 dan jumlah Fx harus kembali sama dengan gaya geser dasar sebagai kontrol keseimbangan.");
-  addTable("story-forces");
+  section("2.3.6.1", "Parameter Spektrum Respons Desain");
+  addTable("seismic-spectrum");
+  const spectrum = handoff.result?.spectrum;
+  if (spectrum) {
+    blocks.push(...equationTriplet("SMS = Fa × Ss", `SMS = ${number(handoff.rawSeismic.fa)} × ${number(handoff.rawSeismic.ss)}`, `SMS = ${number(spectrum.sms.value)} g`));
+    blocks.push(...equationTriplet("SM1 = Fv × S1", `SM1 = ${number(handoff.rawSeismic.fv)} × ${number(handoff.rawSeismic.s1)}`, `SM1 = ${number(spectrum.sm1.value)} g`));
+    blocks.push(...equationTriplet("SDS = ⅔ × SMS", `SDS = ⅔ × ${number(spectrum.sms.value)}`, `SDS = ${number(spectrum.sds.value)} g`));
+    blocks.push(...equationTriplet("SD1 = ⅔ × SM1", `SD1 = ⅔ × ${number(spectrum.sm1.value)}`, `SD1 = ${number(spectrum.sd1.value)} g`));
+    blocks.push(...equationTriplet("T0 = 0,2 × SD1 / SDS", `T0 = 0,2 × ${number(spectrum.sd1.value)} / ${number(spectrum.sds.value)}`, `T0 = ${number(spectrum.t0.value)} detik`));
+    blocks.push(...equationTriplet("Ts = SD1 / SDS", `Ts = ${number(spectrum.sd1.value)} / ${number(spectrum.sds.value)}`, `Ts = ${number(spectrum.ts.value)} detik`));
+  }
+  addFigure("response-spectrum");
+  section("2.3.6.2", "Kategori Desain Seismik");
+  narrative(`Kategori risiko bangunan ditetapkan sebagai kategori ${handoff.rawSeismic.risk_category}. Kategori Desain Seismik ditentukan dari pemeriksaan nilai SDS dan SD1, dengan hasil yang lebih berat sebagai kategori pengendali.`); addTable("seismic-kds");
+  section("2.3.6.3", "Sistem Struktur dan Parameter Desain");
+  narrative(`Sistem penahan gaya seismik yang digunakan adalah ${handoff.selectedSystem?.label ?? "—"}. Parameter desain sistem ditunjukkan pada tabel berikut.`); addTable("seismic-system");
+  section("2.3.6.4", "Periode Fundamental Struktur"); addTable("seismic-period");
+  const period = handoff.result?.period;
+  const parameters = handoff.result?.system_parameters;
+  if (period && parameters) {
+    const height = Math.max(...bundle.geometry.stories.map(({ elevation }) => elevation)) - Math.min(...bundle.geometry.stories.map(({ elevation }) => elevation));
+    blocks.push(...equationTriplet("Ta = Ct × hnˣ", `Ta = ${number(parameters.Ct.value, 4)} × ${number(height)}^${number(parameters.x.value)}`, `Ta = ${number(period.ta.value, 4)} detik`));
+    blocks.push(...equationTriplet("Tmax = Cu × Ta", `Tmax = ${number(period.cu.value)} × ${number(period.ta.value, 4)}`, `Tmax = ${number(period.tmax.value, 4)} detik`));
+  }
+  section("2.3.6.5", "Koefisien Respons dan Gaya Geser Dasar"); addTable("seismic-cs"); addTable("seismic-weight"); addTable("seismic-base-shear");
+  const response = handoff.result?.response_coefficient;
+  const seismicWeight = handoff.result?.seismic_weight;
+  const baseShear = handoff.result?.base_shear;
+  if (response && seismicWeight && baseShear && spectrum && parameters) {
+    blocks.push(...equationTriplet("Cs = SDS / (R / Ie)", `Cs = ${number(spectrum.sds.value)} / (${number(parameters.R.value)} / 1,000)`, `Cs = ${number(response.governing.value, 4)}`));
+    blocks.push(...equationTriplet("V = Cs × W", `V = ${number(response.governing.value, 4)} × ${number(seismicWeight.value)}`, `V = ${number(baseShear.value)} kN`));
+  }
+  section("2.3.6.6", "Distribusi Gaya Lateral per Tingkat");
+  narrative("Gaya geser dasar didistribusikan pada setiap tingkat berdasarkan berat tingkat, elevasi terhadap dasar, dan eksponen distribusi. Jumlah koefisien distribusi vertikal sama dengan satu dan jumlah gaya tingkat sama dengan gaya geser dasar."); addTable("story-forces");
 
   chapter("III", "PERMODELAN STRUKTUR");
   section("3.1", "Model Struktur dengan ETABS");
-  body("ETABS digunakan sebagai perangkat analisis struktur eksternal. Data pada bab ini merupakan paket handoff untuk membentuk model secara konsisten. Engineer tetap bertanggung jawab atas idealisasi elemen, connectivity, diaphragm, kekakuan efektif, mass source, load case, dan pemeriksaan model sebelum analisis.");
-  subsection("3.1.1", "Data Umum Bangunan"); addTable("project-data"); addTable("story-data");
-  subsection("3.1.2", "Pembuatan Grid");
-  body("Grid ETABS dibentuk dari ordinat Grid X dan Grid Y pada modul geometri. Story data mengikuti tinggi dan elevasi yang sama. Dokumentasi tangkapan layar dapat ditempatkan pada slot berikut setelah model proyek dibangun.");
-  addTable("grid-x"); addTable("grid-y"); addFigure("etabs-grid-reference", true);
+  narrative("Analisis struktur dilakukan menggunakan perangkat lunak ETABS setelah data geometri, material, pembebanan, dan ketahanan gempa tersedia. Model harus diperiksa terhadap connectivity, diaphragm, kekakuan efektif, mass source, load case, dan asumsi pemodelan sebelum analisis dijalankan.");
+  section("3.1.1", "Data Umum Bangunan"); addTable("project-data"); addTable("story-data");
+  section("3.1.2", "Pembuatan Grid");
+  narrative("Grid model dibuat dari ordinat arah X dan Y serta elevasi tingkat yang telah ditetapkan. Data berikut digunakan sebagai acuan pada menu Grid Systems dan Story Data ETABS."); addTable("grid-x"); addTable("grid-y"); addFigure("etabs-grid-reference");
   section("3.2", "Permodelan Material dan Penampang");
-  body("Definisi material mengikuti properti pada BAB II. Dimensi penampang dan assignment elemen belum tersedia dalam data proyek Generate #1; engineer harus menetapkan serta memeriksa penampang pada model ETABS dan mengunggah dokumentasi bila ingin dicantumkan.");
-  addFigure("etabs-material-reference", true);
+  narrative("Definisi material mengikuti data pada BAB II. Dimensi penampang, kekakuan efektif, dan assignment elemen ditetapkan serta diperiksa pada model ETABS sebelum analisis."); addFigure("etabs-material-reference");
   section("3.3", "Permodelan Perletakan Pondasi");
-  body("Kondisi tumpuan dan restraint ditetapkan pada ETABS sesuai sistem pondasi serta idealisasi interaksi tanah-struktur. Data ini belum dihitung oleh StruCal dan harus diverifikasi engineer sebelum analisis.");
-  addFigure("etabs-restraint-reference", true);
+  narrative("Kondisi tumpuan dan restraint ditetapkan sesuai sistem pondasi dan idealisasi interaksi tanah-struktur. Penetapan tersebut harus diperiksa oleh perencana pada model ETABS."); addFigure("etabs-restraint-reference");
   section("3.4", "Pembuatan Load Pattern");
-  body("Load pattern dibentuk dari definisi beban aktif. Self-weight multiplier harus diperiksa pada ETABS agar berat sendiri tidak dihitung ganda. Nilai pada tabel menjadi referensi setup dan bukan bukti bahwa load pattern telah dibuat pada file ETABS.");
-  addTable("etabs-patterns"); addFigure("etabs-load-pattern-reference", true);
+  narrative("Load pattern disusun berdasarkan jenis beban yang bekerja. Self-weight multiplier diperiksa agar berat sendiri tidak dihitung ganda."); addTable("etabs-patterns"); addFigure("etabs-load-pattern-reference");
   section("3.5", "Aplikasi Beban pada Struktur melalui ETABS");
-  body("Beban diterapkan pada area lantai atau garis grid sesuai target assignment. Arah, sistem koordinat, tributary area, dan satuan harus diperiksa pada model ETABS. Dokumentasi visual hanya ditampilkan bila berasal dari model proyek.");
-  addTable("load-assignments"); addFigure("etabs-load-assignment-reference", true);
+  narrative("Beban diterapkan pada elemen area atau garis sesuai target assignment. Arah, sistem koordinat, luas tributari, dan satuan diperiksa pada model."); addTable("load-assignments"); addFigure("etabs-load-assignment-reference");
   section("3.6", "Load Cases dan Response Spectrum");
-  body("Load case gravitasi dan seismik disiapkan berdasarkan load pattern serta hasil M6. Damping, arah eksitasi, modal case, faktor skala, dan ketentuan kombinasi modal ditetapkan serta diverifikasi pada ETABS. Generate #1 tidak menyatakan bahwa analisis telah dijalankan.");
-  addTable("etabs-cases"); addFigure("etabs-load-case-reference", true);
+  narrative("Load case gravitasi dan gempa disusun dari pola beban yang telah didefinisikan. Damping, arah eksitasi, modal case, faktor skala, dan metode kombinasi modal ditetapkan serta diverifikasi pada ETABS."); addTable("etabs-cases"); addFigure("etabs-load-case-reference");
   section("3.7", "Kombinasi Beban");
-  body("Kombinasi beban berikut merupakan referensi untuk setup ETABS berdasarkan registry aktif. Respons struktur dari kombinasi tersebut belum dihitung pada tahap ini.");
-  addTable("load-combinations"); addFigure("etabs-combination-reference", true);
-  section("3.8", "Ringkasan Handoff ETABS");
-  body("Checklist berikut membedakan data yang siap, peringatan yang perlu ditinjau, dan item yang tetap menjadi tanggung jawab ETABS atau engineer. Dokumen berakhir pada kesiapan pra-analisis dan tidak memuat output analisis ETABS.");
-  addTable("etabs-readiness");
+  narrative("Kombinasi pembebanan berikut digunakan sebagai referensi penyusunan kombinasi pada ETABS. Analisis respons struktur terhadap kombinasi dilakukan pada tahap analisis model.");
+  const comboMeta = tableMeta.get("load-combinations");
+  blocks.push(caption("Tabel", comboMeta?.effective_caption ?? "Kombinasi Beban"), combinationTable); addFigure("etabs-combination-reference");
+  section("3.8", "Ringkasan Kesiapan Model");
+  narrative("Daftar berikut digunakan untuk memeriksa kelengkapan data sebelum analisis struktur dijalankan. Item yang memerlukan peninjauan tetap menjadi tanggung jawab perencana pada model ETABS."); addTable("etabs-readiness");
 
-  const bodySect = '<w:sectPr><w:footerReference w:type="default" r:id="rIdFooter"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1701" w:right="1701" w:bottom="1701" w:left="2268" w:header="720" w:footer="720" w:gutter="0"/><w:pgNumType w:fmt="decimal" w:start="1"/></w:sectPr>';
-  const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${blocks.join("")}${bodySect}</w:body></w:document>`;
-  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="240" w:line="360" w:lineRule="auto"/><w:jc w:val="both"/><w:ind w:firstLine="720"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="3. Normal"/></w:style><w:style w:type="paragraph" w:styleId="CoverYear"><w:name w:val="Cover Year"/><w:pPr><w:spacing w:after="700"/><w:ind w:firstLine="0"/></w:pPr><w:rPr><w:sz w:val="20"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="CoverTitle"><w:name w:val="Cover Title"/><w:pPr><w:spacing w:after="160" w:line="620"/><w:ind w:firstLine="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="60"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="CoverSubtitle"><w:name w:val="Cover Subtitle"/><w:pPr><w:spacing w:after="160" w:line="360"/><w:ind w:firstLine="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="CoverProject"><w:name w:val="Cover Project"/><w:pPr><w:spacing w:after="200"/><w:ind w:firstLine="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="CoverBand"><w:name w:val="Cover Band"/><w:pPr><w:spacing w:after="420"/><w:ind w:firstLine="0"/><w:shd w:fill="0F687B"/></w:pPr><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="20"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="FrontHeading"><w:name w:val="Front Heading"/><w:pPr><w:keepNext/><w:spacing w:after="240"/><w:jc w:val="center"/><w:ind w:firstLine="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="1. BAB"/><w:basedOn w:val="Normal"/><w:next w:val="ChapterTitle"/><w:qFormat/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:after="0" w:line="240"/><w:jc w:val="center"/><w:ind w:firstLine="0"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="ChapterTitle"><w:name w:val="Chapter Title"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:after="240" w:line="240"/><w:jc w:val="center"/><w:ind w:firstLine="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="2. SUB-BAB"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:after="120" w:line="240"/><w:ind w:left="720" w:hanging="720"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="3. SUB-BAB"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:after="120" w:line="240"/><w:ind w:left="720" w:hanging="720"/><w:outlineLvl w:val="2"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Caption"><w:name w:val="Caption"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="80" w:after="200" w:line="240"/><w:jc w:val="center"/><w:ind w:firstLine="0"/></w:pPr><w:rPr><w:sz w:val="20"/></w:rPr></w:style></w:styles>`;
-  const footer = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/><w:ind w:firstLine="0"/></w:pPr>${field("PAGE", "1")}</w:p></w:ftr>`;
-  const imageRels = media.map(({ media: item }) => `<Relationship Id="${item.id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${item.name}"/>`).join("");
-  const files = [
-    { name: "[Content_Types].xml", data: encoder.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`) },
-    { name: "_rels/.rels", data: encoder.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`) },
-    { name: "word/document.xml", data: encoder.encode(document) },
-    { name: "word/styles.xml", data: encoder.encode(styles) },
-    { name: "word/settings.xml", data: encoder.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:updateFields w:val="true"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>`) },
-    { name: "word/footer1.xml", data: encoder.encode(footer) },
-    { name: "word/_rels/document.xml.rels", data: encoder.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdFooter" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>${imageRels}</Relationships>`) },
-    { name: "docProps/core.xml", data: encoder.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xml(bundle.project.title)} Generate 1</dc:title><dc:creator>StruCal</dc:creator><dc:description>Template map verified against ${xml(snapshot.template_reference)}</dc:description><dcterms:created xsi:type="dcterms:W3CDTF">${xml(snapshot.generated_at)}</dcterms:created></cp:coreProperties>`) },
-    { name: "docProps/app.xml", data: encoder.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>StruCal</Application></Properties>`) },
-    ...media.map(({ media: item }) => ({ name: `word/media/${item.name}`, data: item.data })),
-  ];
-  return zip(files);
+  const documentXml = `${body.prefix}${cover.join("")}${frontMatter.join("")}${frontSection}${blocks.join("")}${finalSection}${body.suffix}`;
+  files.set("word/document.xml", encoder.encode(documentXml));
+  const relationshipsName = "word/_rels/document.xml.rels";
+  const relationships = decoder.decode(files.get(relationshipsName)).replace("</Relationships>", `${media.map(({ media: item }) => `<Relationship Id="${item.id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${item.name}"/>`).join("")}</Relationships>`);
+  files.set(relationshipsName, encoder.encode(relationships));
+  for (const { media: item } of media) files.set(`word/media/${item.name}`, item.data);
+  const settingsName = "word/settings.xml";
+  let settings = decoder.decode(files.get(settingsName));
+  settings = settings.includes("<w:updateFields") ? settings.replace(/<w:updateFields[^>]*\/>/, '<w:updateFields w:val="true"/>') : settings.replace("<w:hdrShapeDefaults", '<w:updateFields w:val="true"/><w:hdrShapeDefaults');
+  files.set(settingsName, encoder.encode(settings));
+  const coreName = "docProps/core.xml";
+  const core = decoder.decode(files.get(coreName)).replace(/<dc:title>[\s\S]*?<\/dc:title>/, `<dc:title>${xml(bundle.project.title)} — Laporan Perhitungan Struktur</dc:title>`);
+  files.set(coreName, encoder.encode(core));
+  return zip([...files].map(([name, data]) => ({ name, data })));
 }

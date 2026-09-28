@@ -380,11 +380,16 @@ h1, h2, p { margin: 0; }
 .report-card-head strong { font-size: .78rem; }
 .report-card-list label, .figure-controls label:not(.button) { display: grid; gap: .3rem; color: #53615c; font-size: .66rem; font-weight: 700; }
 .report-card-list input, .figure-controls input { min-height: 2.35rem; padding: .45rem .6rem; border: 1px solid #cfd8d4; border-radius: .35rem; }
-.figure-card { display: grid; grid-template-columns: minmax(16rem, .75fr) minmax(20rem, 1.25fr); gap: 1rem; padding: .8rem; border: 1px solid #e1e7e4; border-radius: .45rem; }
+.figure-card { display: grid; grid-template-columns: minmax(22rem, 1.2fr) minmax(18rem, .8fr); gap: 1rem; padding: .8rem; border: 1px solid #e1e7e4; border-radius: .45rem; }
+.figure-preview-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+.figure-preview-pair > div { display: grid; gap: .3rem; min-width: 0; }
+.figure-preview-pair small { color: #78857f; font-size: .6rem; font-weight: 700; }
 .figure-preview { display: grid; min-height: 13rem; place-items: center; overflow: hidden; border: 1px solid #dce3e0; border-radius: .35rem; background: #f8faf9; }
 .figure-preview img { width: 100%; height: 13rem; object-fit: contain; }
 .figure-preview svg { width: 100%; height: 12rem; fill: none; stroke: #73827c; stroke-width: 2; }
 .figure-preview svg .accent { stroke: #1c594b; stroke-width: 4; }
+.figure-preview svg .guide { stroke: #b5c0bc; stroke-dasharray: 4; }
+.figure-preview svg text { fill: #53615c; stroke: none; font-size: 10px; }
 .reference-placeholder { display: grid; gap: .35rem; justify-items: center; color: #75827d; font-size: .68rem; }
 .reference-placeholder strong { color: #52615b; }
 .figure-controls { display: grid; align-content: start; gap: .75rem; }
@@ -415,6 +420,7 @@ h1, h2, p { margin: 0; }
   .geometry-workspace { grid-template-columns: 1fr; }
   .viewer-panel { min-height: 30rem; }
   .figure-card { grid-template-columns: 1fr; }
+  .figure-preview-pair { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
