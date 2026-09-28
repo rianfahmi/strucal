@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { calculateSeismicWeight } from "../lib/loads";
 import { getSeismicRegistry } from "../lib/seismic-registry";
-import { calculateSeismic, seismicContext, validateSeismicInput, type SeismicModel, type TraceValue } from "../lib/seismic";
+import { calculateSeismic, seismicContext, validateSeismicInput, type ManualSeismicInputKey, type SeismicModel, type TraceValue } from "../lib/seismic";
 import { ENGINE_VERSION } from "../lib/projects";
 import { useProjects, type SaveStatus } from "./project-provider";
 
@@ -47,6 +47,10 @@ function SeismicEditor({ initial, context, registryVersion, markUnsaved, saveSei
     apply({ ...model, raw_inputs: { ...model.raw_inputs, [key]: value }, selected_structural_system_id: null });
   }
 
+  function setProvenance(key: ManualSeismicInputKey, field: "source" | "entered_by", value: string) {
+    apply({ ...model, input_provenance: { ...model.input_provenance, [key]: { ...model.input_provenance[key], [field]: value } } });
+  }
+
   async function saveNow() {
     clearTimeout(timer.current);
     await saveSeismic({ ...model, derived_results: result }, "manual");
@@ -58,13 +62,19 @@ function SeismicEditor({ initial, context, registryVersion, markUnsaved, saveSei
     </div>
 
     {tab === "input" && <section aria-labelledby="seismic-input-title">
-      <Heading id="seismic-input-title" title="Input Dasar" badge="INPUT" />
+      <Heading id="seismic-input-title" title="Engineer / PUSKIM Input" badge="INPUT" />
+      <p className="seismic-input-note">Tidak ada lookup atau interpolasi otomatis untuk Site Class, Ss, S1, TL, Fa, dan Fv pada M6 V1.</p>
       <div className="seismic-input-grid">
         <NumberInput label="Ss" value={model.raw_inputs.ss} unit="g" issue={issues.find(({ path }) => path === "raw_inputs.ss")?.message} onChange={(value) => setRaw("ss", value)} />
         <NumberInput label="S1" value={model.raw_inputs.s1} unit="g" issue={issues.find(({ path }) => path === "raw_inputs.s1")?.message} onChange={(value) => setRaw("s1", value)} />
-        <TextInput label="Kelas situs" value={model.raw_inputs.site_class} issue={issues.find(({ path }) => path === "raw_inputs.site_class")?.message} onChange={(value) => setRaw("site_class", value)} />
-        <TextInput label="Kategori risiko" value={model.raw_inputs.risk_category} issue={issues.find(({ path }) => path === "raw_inputs.risk_category")?.message} onChange={(value) => setRaw("risk_category", value)} />
+        <NumberInput label="TL" value={model.raw_inputs.tl} unit="s" issue={issues.find(({ path }) => path === "raw_inputs.tl")?.message} onChange={(value) => setRaw("tl", value)} />
+        <NumberInput label="Fa" value={model.raw_inputs.fa} unit="-" issue={issues.find(({ path }) => path === "raw_inputs.fa")?.message} onChange={(value) => setRaw("fa", value)} />
+        <NumberInput label="Fv" value={model.raw_inputs.fv} unit="-" issue={issues.find(({ path }) => path === "raw_inputs.fv")?.message} onChange={(value) => setRaw("fv", value)} />
+        <SelectInput label="Kelas situs" value={model.raw_inputs.site_class} options={["SA", "SB", "SC", "SD", "SE", "SF"]} issue={issues.find(({ path }) => path === "raw_inputs.site_class")?.message} onChange={(value) => setRaw("site_class", value)} />
+        <SelectInput label="Kategori risiko" value={model.raw_inputs.risk_category} options={["I", "II", "III", "IV"]} issue={issues.find(({ path }) => path === "raw_inputs.risk_category")?.message} onChange={(value) => setRaw("risk_category", value)} />
       </div>
+      <ProvenanceTable model={model} issues={issues} onChange={setProvenance} />
+      <div className="auto-calculated-list"><strong>AUTO CALCULATED</strong><span>SMS · SM1 · SDS · SD1 · T0 · Ts · KDS · validasi sistem · R/Ω0/Cd · Ct/x · Ta · Cu · Tmax · Cs · V · Fx · response spectrum</span></div>
       <div className="seismic-inherited">
         <article><span>Tinggi bangunan</span><strong>{context.building_height.toFixed(3)} m</strong><small className="badge badge-inherited">INHERITED · Geometry</small></article>
         <article><span>Berat seismik</span><strong>{context.seismic_weight.status === "AVAILABLE" ? `${context.seismic_weight.value.toFixed(3)} kN` : "Belum valid"}</strong><small className="badge badge-inherited">INHERITED · M5</small></article>
@@ -80,19 +90,20 @@ function SeismicEditor({ initial, context, registryVersion, markUnsaved, saveSei
     </section>}
 
     {tab === "systems" && <section aria-labelledby="seismic-system-title"><Heading id="seismic-system-title" title="Review Sistem Struktur" badge="CODE + SELECTED" />
-      {result.system_eligibility.length ? <><div className="system-list">{result.system_eligibility.map((system) => <article key={system.id} className={`system-${system.status.toLowerCase()}`}><div><strong>{system.label}</strong><span className="badge">{system.status}</span></div><p>{system.reason}</p><small>{system.standard_ref}</small></article>)}</div><label className="seismic-select"><span>Sistem struktur terpilih</span><select value={model.selected_structural_system_id ?? ""} onChange={(event) => apply({ ...model, selected_structural_system_id: event.target.value || null })}><option value="">Pilih sistem valid</option>{result.system_eligibility.map((system) => <option key={system.id} value={system.id} disabled={system.status !== "ALLOWED"}>{system.label} · {system.status}</option>)}</select></label></> : <RegistryBlock status={result.status} warnings={result.warnings} />}
+      {result.system_eligibility.length ? <><EngineeringOptions model={model} apply={apply} /><div className="system-list">{result.system_eligibility.map((system) => <article key={system.id} className={`system-${system.status.toLowerCase()}`}><div><strong>{system.label}</strong><span className="badge">{system.status}</span></div><p>{system.reason}</p><small>{system.standard_ref}</small></article>)}</div><label className="seismic-select"><span>Sistem struktur terpilih</span><select value={model.selected_structural_system_id ?? ""} onChange={(event) => apply({ ...model, selected_structural_system_id: event.target.value || null })}><option value="">Pilih sistem valid</option>{result.system_eligibility.map((system) => <option key={system.id} value={system.id} disabled={system.status !== "ALLOWED"}>{system.label} · {system.status}</option>)}</select></label></> : <RegistryBlock status={result.status} warnings={result.warnings} />}
     </section>}
 
     {tab === "results" && <section aria-labelledby="seismic-results-title"><Heading id="seismic-results-title" title="Hasil Analisis" badge="AUTO" />
-      {result.status === "VALID" ? <div className="trace-grid">{Object.entries(result.system_parameters!).map(([label, trace]) => <TraceCard key={label} label={label === "omega0" ? "Ω0" : label} trace={trace} />)}<TraceCard label="Ta" trace={result.period!.ta} />{result.period!.limit && <TraceCard label="Batas periode" trace={result.period!.limit} />}<TraceCard label="Cs" trace={result.response_coefficient!} /><TraceCard label="W" trace={result.seismic_weight!} /><TraceCard label="V" trace={result.base_shear!} /></div> : <RegistryBlock status={result.status} warnings={result.warnings.length ? result.warnings : ["Pilih sistem struktur berstatus ALLOWED."]} />}
+      {result.status === "VALID" ? <><div className="period-classification"><strong>{result.system_parameters!.period_classification.label}</strong><span>{result.system_parameters!.period_classification.reason}</span><small>{result.system_parameters!.period_classification.standard_ref}</small></div><div className="trace-grid">{(["R", "omega0", "Cd", "Ct", "x"] as const).map((label) => <TraceCard key={label} label={label === "omega0" ? "Ω0" : label} trace={result.system_parameters![label]} />)}<TraceCard label="Ta" trace={result.period!.ta} /><TraceCard label="Cu" trace={result.period!.cu} /><TraceCard label="Tmax" trace={result.period!.tmax} /><TraceCard label="Periode digunakan" trace={result.period!.used} /><TraceCard label="Cs nominal" trace={result.response_coefficient!.nominal} /><TraceCard label="Cs batas atas" trace={result.response_coefficient!.upper_bound} />{result.response_coefficient!.lower_bounds.map((trace) => <TraceCard key={trace.formula_id} label="Cs batas bawah" trace={trace} />)}<TraceCard label="Cs governing" trace={result.response_coefficient!.governing} /><TraceCard label="W" trace={result.seismic_weight!} /><TraceCard label="V" trace={result.base_shear!} /></div></> : <RegistryBlock status={result.status} warnings={result.warnings.length ? result.warnings : ["Pilih sistem struktur berstatus ALLOWED."]} />}
     </section>}
 
     {tab === "chart" && <section aria-labelledby="seismic-chart-title"><Heading id="seismic-chart-title" title="Response Spectrum" badge="AUTO" />
-      {result.response_spectrum.length ? <><SpectrumChart points={result.response_spectrum} /><div className="table-scroll"><table className="seismic-table"><thead><tr><th>Periode (s)</th><th>Sa (g)</th><th>Formula ID</th></tr></thead><tbody>{result.response_spectrum.map((point) => <tr key={point.period}><td>{point.period}</td><td>{point.acceleration.value}</td><td>{point.acceleration.formula_id}</td></tr>)}</tbody></table></div></> : <RegistryBlock status={result.status} warnings={result.warnings} />}
+      <div className="spectrum-display-options"><NumberInput label="Tmax tampilan" value={model.display_options.max_period} unit="s" onChange={(value) => value !== null && apply({ ...model, display_options: { ...model.display_options, max_period: value } })} /><NumberInput label="Step" value={model.display_options.step} unit="s" onChange={(value) => value !== null && apply({ ...model, display_options: { ...model.display_options, step: value } })} /></div>
+      {result.response_spectrum.length ? <><p className="seismic-input-note">Sampling hanya untuk presentasi/export; fungsi Sa(T) kontinu tetap governing. TL={model.raw_inputs.tl} s {model.raw_inputs.tl! > model.display_options.max_period ? "tersimpan di provenance dan berada di luar chart." : "disuntikkan tepat pada chart."}</p><SpectrumChart points={result.response_spectrum} /><div className="table-scroll spectrum-table"><table className="seismic-table"><thead><tr><th>Periode (s)</th><th>Sa (g)</th><th>Formula ID</th></tr></thead><tbody>{result.response_spectrum.map((point) => <tr key={point.period}><td>{point.period}</td><td>{point.acceleration.value}</td><td>{point.acceleration.formula_id}</td></tr>)}</tbody></table></div></> : <RegistryBlock status={result.status} warnings={result.warnings} />}
     </section>}
 
     {tab === "stories" && <section aria-labelledby="seismic-stories-title"><Heading id="seismic-stories-title" title="Distribusi Story" badge="AUTO" />
-      {result.story_forces.length ? <div className="table-scroll"><table className="seismic-table"><thead><tr><th>Story</th><th>Elevasi (m)</th><th>W (kN)</th><th>Fx (kN)</th><th>Formula ID</th></tr></thead><tbody>{result.story_forces.map((row) => <tr key={row.story}><td>{row.story}</td><td>{row.elevation}</td><td>{row.weight}</td><td>{row.force.value}</td><td>{row.force.formula_id}</td></tr>)}</tbody></table></div> : <RegistryBlock status={result.status} warnings={result.warnings} />}
+      {result.story_forces.length ? <><div className="governing-kds"><span>Eksponen distribusi k</span><strong>{result.story_exponent!.value}</strong><small>{result.story_exponent!.standard_ref}</small></div><div className="table-scroll"><table className="seismic-table"><thead><tr><th>Story</th><th>Elevasi (m)</th><th>W (kN)</th><th>Cvx</th><th>Fx (kN)</th><th>Formula ID</th></tr></thead><tbody>{result.story_forces.map((row) => <tr key={row.story}><td>{row.story}</td><td>{row.elevation}</td><td>{row.weight}</td><td>{row.cvx.value}</td><td>{row.force.value}</td><td>{row.force.formula_id}</td></tr>)}</tbody></table></div></> : <RegistryBlock status={result.status} warnings={result.warnings} />}
     </section>}
 
     {tab === "validation" && <section aria-labelledby="seismic-validation-title"><Heading id="seismic-validation-title" title="Validation" badge={result.status} />
@@ -111,8 +122,25 @@ function NumberInput({ label, value, unit, issue, onChange }: { label: string; v
   return <label className="material-field"><span>{label}</span><div className="number-with-unit"><input type="number" min="0" step="any" value={value ?? ""} aria-invalid={Boolean(issue)} onChange={(event) => onChange(event.target.value === "" ? null : Number(event.target.value))} /><span>{unit}</span><small>INPUT</small></div>{issue && <small className="field-error">{issue}</small>}</label>;
 }
 
-function TextInput({ label, value, issue, onChange }: { label: string; value: string; issue?: string; onChange: (value: string) => void }) {
-  return <label className="material-field"><span>{label}</span><div className="input-with-source"><input value={value} aria-invalid={Boolean(issue)} onChange={(event) => onChange(event.target.value)} /><span>INPUT</span></div>{issue && <small className="field-error">{issue}</small>}</label>;
+function SelectInput({ label, value, options, issue, onChange }: { label: string; value: string; options: string[]; issue?: string; onChange: (value: string) => void }) {
+  return <label className="material-field"><span>{label}</span><div className="input-with-source"><select value={value} aria-invalid={Boolean(issue)} onChange={(event) => onChange(event.target.value)}><option value="">Pilih</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select><span>INPUT</span></div>{issue && <small className="field-error">{issue}</small>}</label>;
+}
+
+function ProvenanceTable({ model, issues, onChange }: { model: SeismicModel; issues: ReturnType<typeof validateSeismicInput>; onChange: (key: ManualSeismicInputKey, field: "source" | "entered_by", value: string) => void }) {
+  const labels: Record<ManualSeismicInputKey, string> = { site_class: "Site Class", ss: "Ss", s1: "S1", tl: "TL", fa: "Fa", fv: "Fv" };
+  return <div className="table-scroll provenance-table"><table className="seismic-table"><thead><tr><th>Input</th><th>Sumber</th><th>Entered by</th><th>Status</th><th>Project revision</th></tr></thead><tbody>{(Object.keys(labels) as ManualSeismicInputKey[]).map((key) => {
+    const provenance = model.input_provenance[key];
+    const sourceIssue = issues.find(({ path }) => path === `input_provenance.${key}.source`)?.message;
+    const userIssue = issues.find(({ path }) => path === `input_provenance.${key}.entered_by`)?.message;
+    return <tr key={key}><td>{labels[key]}</td><td><input value={provenance.source} aria-label={`Sumber ${labels[key]}`} aria-invalid={Boolean(sourceIssue)} onChange={(event) => onChange(key, "source", event.target.value)} />{sourceIssue && <small className="field-error">{sourceIssue}</small>}</td><td><input value={provenance.entered_by} aria-label={`Penginput ${labels[key]}`} aria-invalid={Boolean(userIssue)} onChange={(event) => onChange(key, "entered_by", event.target.value)} />{userIssue && <small className="field-error">{userIssue}</small>}</td><td><span className="badge badge-input">INPUT</span></td><td>{provenance.project_revision}</td></tr>;
+  })}</tbody></table></div>;
+}
+
+function EngineeringOptions({ model, apply }: { model: SeismicModel; apply: (next: SeismicModel) => void }) {
+  const options = model.engineering_options;
+  const setOption = (key: "moment_frame_carries_all_seismic_force" | "moment_frame_unrestrained_by_rigid_components", value: boolean) => apply({ ...model, engineering_options: { ...options, [key]: value }, selected_structural_system_id: null });
+  const setHeight = (patch: Partial<typeof options.special_height>) => apply({ ...model, engineering_options: { ...options, special_height: { ...options.special_height, ...patch } }, selected_structural_system_id: null });
+  return <fieldset className="engineering-options"><legend>Kondisi klasifikasi dan 7.2.5.4</legend><label><input type="checkbox" checked={options.moment_frame_carries_all_seismic_force} onChange={(event) => setOption("moment_frame_carries_all_seismic_force", event.target.checked)} /> Rangka momen memikul 100% gaya seismik</label><label><input type="checkbox" checked={options.moment_frame_unrestrained_by_rigid_components} onChange={(event) => setOption("moment_frame_unrestrained_by_rigid_components", event.target.checked)} /> Tidak dilingkupi/terhubung komponen lebih kaku yang mencegah defleksi</label><label><input type="checkbox" checked={options.special_height.enabled} onChange={(event) => setHeight({ enabled: event.target.checked })} /> Terapkan kenaikan batas tinggi 7.2.5.4</label><label><input type="checkbox" checked={options.special_height.reinforced_concrete_wall_cast_in_place} onChange={(event) => setHeight({ reinforced_concrete_wall_cast_in_place: event.target.checked })} /> Dinding beton bertulang khusus adalah cor di tempat</label><label><input type="checkbox" checked={options.special_height.no_excessive_torsional_irregularity_type_1b} onChange={(event) => setHeight({ no_excessive_torsional_irregularity_type_1b: event.target.checked })} /> Tidak ada ketidakberaturan torsi berlebihan Tipe 1b</label><NumberInput label="Maks. gaya tiap bidang" value={options.special_height.max_plane_share_percent} unit="%" onChange={(value) => setHeight({ max_plane_share_percent: value })} /></fieldset>;
 }
 
 function RegistryBlock({ status, warnings }: { status?: string; warnings: string[] }) {

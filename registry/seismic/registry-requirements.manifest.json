@@ -1,0 +1,297 @@
+{
+  "manifest_id": "strucal-m6-seismic-registry-requirements",
+  "manifest_version": "1.0.0",
+  "project_registry_version": "SNI-1726:2019|SNI-1727:2020|SNI-2847:2019",
+  "seismic_standard_id": "SNI 1726",
+  "seismic_standard_version": "2019",
+  "status": "APPROVED_M6_V1",
+  "item_schema": "./registry-item.schema.json",
+  "populated_registry": "./sni-1726-2019.engineer-review.json",
+  "items": [
+    {
+      "registry_key": "seismic.site.fa",
+      "category": "FA_TABLE",
+      "standard_id": "SNI 1726",
+      "standard_version": "2019",
+      "clause_or_table_reference": null,
+      "applicability": { "description": "Lookup koefisien situs Fa.", "conditions": ["Kelas situs tersedia", "Ss tersedia"] },
+      "inputs": [
+        { "name": "site_class", "description": "Kelas situs pada sumbu tabel.", "unit": null, "value_status": "UNRESOLVED" },
+        { "name": "Ss", "description": "Parameter spektral periode pendek pada sumbu tabel.", "unit": "g", "value_status": "UNRESOLVED" }
+      ],
+      "outputs": [{ "name": "Fa", "description": "Koefisien situs periode pendek.", "unit": "dimensionless", "value_status": "UNRESOLVED" }],
+      "units": { "Ss": "g", "Fa": "dimensionless" },
+      "interpolation_method": null,
+      "boundary_behavior": null,
+      "formula_id": null,
+      "formula_expression": null,
+      "required_details": ["Semua nilai sumbu dan sel tabel", "Aturan interpolasi antar nilai Ss", "Perlakuan nilai di bawah/di atas batas", "Perlakuan kelas situs khusus", "Referensi tabel"],
+      "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "registry_key": "seismic.site.fv",
+      "category": "FV_TABLE",
+      "standard_id": "SNI 1726",
+      "standard_version": "2019",
+      "clause_or_table_reference": null,
+      "applicability": { "description": "Lookup koefisien situs Fv.", "conditions": ["Kelas situs tersedia", "S1 tersedia"] },
+      "inputs": [
+        { "name": "site_class", "description": "Kelas situs pada sumbu tabel.", "unit": null, "value_status": "UNRESOLVED" },
+        { "name": "S1", "description": "Parameter spektral satu detik pada sumbu tabel.", "unit": "g", "value_status": "UNRESOLVED" }
+      ],
+      "outputs": [{ "name": "Fv", "description": "Koefisien situs satu detik.", "unit": "dimensionless", "value_status": "UNRESOLVED" }],
+      "units": { "S1": "g", "Fv": "dimensionless" },
+      "interpolation_method": null,
+      "boundary_behavior": null,
+      "formula_id": null,
+      "formula_expression": null,
+      "required_details": ["Semua nilai sumbu dan sel tabel", "Aturan interpolasi antar nilai S1", "Perlakuan nilai di bawah/di atas batas", "Perlakuan kelas situs khusus", "Referensi tabel"],
+      "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "registry_key": "seismic.spectrum.design",
+      "category": "DESIGN_SPECTRUM",
+      "standard_id": "SNI 1726",
+      "standard_version": "2019",
+      "clause_or_table_reference": null,
+      "applicability": { "description": "Derivasi parameter dan response spectrum desain.", "conditions": ["Fa dan Fv berstatus APPROVED", "Ss dan S1 valid"] },
+      "inputs": [
+        { "name": "Ss", "description": "Parameter spektral periode pendek.", "unit": "g", "value_status": "UNRESOLVED" },
+        { "name": "S1", "description": "Parameter spektral satu detik.", "unit": "g", "value_status": "UNRESOLVED" },
+        { "name": "Fa", "description": "Koefisien situs periode pendek.", "unit": "dimensionless", "value_status": "UNRESOLVED" },
+        { "name": "Fv", "description": "Koefisien situs satu detik.", "unit": "dimensionless", "value_status": "UNRESOLVED" },
+        { "name": "T", "description": "Periode evaluasi spectrum.", "unit": "s", "value_status": "UNRESOLVED" },
+        { "name": "TL", "description": "Periode transisi panjang bila berlaku.", "unit": "s", "value_status": "UNRESOLVED" }
+      ],
+      "outputs": [
+        { "name": "SMS", "description": "Parameter respons spektral MCER periode pendek.", "unit": "g", "value_status": "UNRESOLVED" },
+        { "name": "SM1", "description": "Parameter respons spektral MCER satu detik.", "unit": "g", "value_status": "UNRESOLVED" },
+        { "name": "SDS", "description": "Parameter respons spektral desain periode pendek.", "unit": "g", "value_status": "UNRESOLVED" },
+        { "name": "SD1", "description": "Parameter respons spektral desain satu detik.", "unit": "g", "value_status": "UNRESOLVED" },
+        { "name": "T0", "description": "Periode transisi awal.", "unit": "s", "value_status": "UNRESOLVED" },
+        { "name": "Ts", "description": "Periode transisi plateau.", "unit": "s", "value_status": "UNRESOLVED" },
+        { "name": "Sa", "description": "Ordinata response spectrum desain.", "unit": "g", "value_status": "UNRESOLVED" }
+      ],
+      "units": { "Ss": "g", "S1": "g", "Fa": "dimensionless", "Fv": "dimensionless", "SMS": "g", "SM1": "g", "SDS": "g", "SD1": "g", "T0": "s", "Ts": "s", "TL": "s", "T": "s", "Sa": "g" },
+      "interpolation_method": null,
+      "boundary_behavior": null,
+      "formula_id": null,
+      "formula_expression": null,
+      "required_details": ["Formula ID dan ekspresi SMS", "Formula ID dan ekspresi SM1", "Formula ID dan ekspresi SDS", "Formula ID dan ekspresi SD1", "Formula ID dan ekspresi T0", "Formula ID dan ekspresi Ts", "Sumber dan perilaku TL bila berlaku", "Definisi piecewise Sa(T) lengkap", "Kondisi tiap segmen dan kontinuitas boundary", "Referensi setiap formula"],
+      "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "registry_key": "seismic.kds.determination",
+      "category": "KDS_DETERMINATION",
+      "standard_id": "SNI 1726",
+      "standard_version": "2019",
+      "clause_or_table_reference": null,
+      "applicability": { "description": "Penentuan dan governing KDS dari seluruh aturan yang berlaku.", "conditions": ["Kategori risiko tersedia", "SDS tersedia", "SD1 tersedia"] },
+      "inputs": [
+        { "name": "risk_category", "description": "Kategori risiko proyek.", "unit": null, "value_status": "UNRESOLVED" },
+        { "name": "SDS", "description": "Parameter desain periode pendek.", "unit": "g", "value_status": "UNRESOLVED" },
+        { "name": "SD1", "description": "Parameter desain satu detik.", "unit": "g", "value_status": "UNRESOLVED" }
+      ],
+      "outputs": [
+        { "name": "kds_by_sds", "description": "KDS hasil aturan SDS.", "unit": null, "value_status": "UNRESOLVED" },
+        { "name": "kds_by_sd1", "description": "KDS hasil aturan SD1.", "unit": null, "value_status": "UNRESOLVED" },
+        { "name": "governing_kds", "description": "KDS governing.", "unit": null, "value_status": "UNRESOLVED" }
+      ],
+      "units": { "SDS": "g", "SD1": "g", "KDS": "category" },
+      "interpolation_method": null,
+      "boundary_behavior": null,
+      "formula_id": null,
+      "formula_expression": null,
+      "required_details": ["Semua tabel/aturan berdasarkan SDS", "Semua tabel/aturan berdasarkan SD1", "Ketergantungan kategori risiko", "Inklusivitas setiap threshold", "Aturan governing antar hasil", "Referensi setiap check"],
+      "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "registry_key": "seismic.system.eligibility",
+      "category": "STRUCTURAL_SYSTEM_ELIGIBILITY",
+      "standard_id": "SNI 1726",
+      "standard_version": "2019",
+      "clause_or_table_reference": null,
+      "applicability": { "description": "Evaluasi seluruh sistem struktur terhadap kondisi proyek.", "conditions": ["KDS governing tersedia", "Material, tinggi, dan kategori risiko tersedia"] },
+      "inputs": [
+        { "name": "system_id", "description": "Identifier stabil sistem struktur.", "unit": null, "value_status": "UNRESOLVED" },
+        { "name": "material_family", "description": "Material/famili sistem.", "unit": null, "value_status": "UNRESOLVED" },
+        { "name": "KDS", "description": "KDS governing.", "unit": null, "value_status": "UNRESOLVED" },
+        { "name": "building_height", "description": "Tinggi bangunan relatif level dasar.", "unit": "m", "value_status": "UNRESOLVED" },
+        { "name": "risk_category", "description": "Kategori risiko.", "unit": null, "value_status": "UNRESOLVED" },
+        { "name": "project_conditions", "description": "Kondisi khusus yang relevan.", "unit": null, "value_status": "UNRESOLVED" }
+      ],
+      "outputs": [
+        { "name": "eligibility_status", "description": "ALLOWED, CONDITIONAL, atau BLOCKED.", "unit": null, "value_status": "UNRESOLVED" },
+        { "name": "reason", "description": "Alasan keputusan yang dapat diaudit.", "unit": null, "value_status": "UNRESOLVED" }
+      ],
+      "units": { "building_height": "m", "eligibility_status": "enum" },
+      "interpolation_method": null,
+      "boundary_behavior": null,
+      "formula_id": null,
+      "formula_expression": null,
+      "required_details": ["Daftar sistem lengkap", "Identifier dan label", "Material/famili", "Allowance tiap KDS", "Batas tinggi beserta inklusivitas", "Pembatasan kategori risiko", "Kondisi khusus", "Aturan ALLOWED/CONDITIONAL/BLOCKED", "Alasan dan referensi setiap keputusan"],
+      "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "registry_key": "seismic.system.parameters",
+      "category": "STRUCTURAL_SYSTEM_PARAMETERS",
+      "standard_id": "SNI 1726",
+      "standard_version": "2019",
+      "clause_or_table_reference": null,
+      "applicability": { "description": "Lookup parameter setelah sistem berstatus ALLOWED dipilih.", "conditions": ["system_id valid", "eligibility_status ALLOWED"] },
+      "inputs": [{ "name": "system_id", "description": "Identifier sistem struktur terpilih.", "unit": null, "value_status": "UNRESOLVED" }],
+      "outputs": [
+        { "name": "R", "description": "Koefisien modifikasi respons.", "unit": "dimensionless", "value_status": "UNRESOLVED" },
+        { "name": "Omega0", "description": "Faktor kuat lebih sistem.", "unit": "dimensionless", "value_status": "UNRESOLVED" },
+        { "name": "Cd", "description": "Faktor pembesaran defleksi.", "unit": "dimensionless", "value_status": "UNRESOLVED" },
+        { "name": "Ct", "description": "Koefisien periode pendekatan.", "unit": "code-defined", "value_status": "UNRESOLVED" },
+        { "name": "x", "description": "Eksponen periode pendekatan.", "unit": "dimensionless", "value_status": "UNRESOLVED" },
+        { "name": "additional_parameters", "description": "Parameter sistem/periode lain yang diwajibkan.", "unit": "code-defined", "value_status": "UNRESOLVED" }
+      ],
+      "units": { "R": "dimensionless", "Omega0": "dimensionless", "Cd": "dimensionless", "Ct": "code-defined", "x": "dimensionless" },
+      "interpolation_method": null,
+      "boundary_behavior": null,
+      "formula_id": null,
+      "formula_expression": null,
+      "required_details": ["Nilai R per system_id", "Nilai Ω0 per system_id", "Nilai Cd per system_id", "Nilai Ct per system_id", "Nilai x per system_id", "Parameter tambahan", "Referensi per nilai"],
+      "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "registry_key": "seismic.period.approximate",
+      "category": "PERIOD_CALCULATION",
+      "standard_id": "SNI 1726",
+      "standard_version": "2019",
+      "clause_or_table_reference": null,
+      "applicability": { "description": "Periode fundamental pendekatan dan batas yang berlaku.", "conditions": ["Tinggi bangunan tersedia", "Ct dan x sistem tersedia"] },
+      "inputs": [
+        { "name": "building_height", "description": "Tinggi bangunan relatif level dasar.", "unit": "m", "value_status": "UNRESOLVED" },
+        { "name": "Ct", "description": "Koefisien dari sistem terpilih.", "unit": "code-defined", "value_status": "UNRESOLVED" },
+        { "name": "x", "description": "Eksponen dari sistem terpilih.", "unit": "dimensionless", "value_status": "UNRESOLVED" },
+        { "name": "period_limit_parameters", "description": "Parameter lookup batas/periode maksimum.", "unit": "code-defined", "value_status": "UNRESOLVED" }
+      ],
+      "outputs": [
+        { "name": "Ta", "description": "Periode fundamental pendekatan.", "unit": "s", "value_status": "UNRESOLVED" },
+        { "name": "maximum_period", "description": "Batas periode maksimum bila berlaku.", "unit": "s", "value_status": "UNRESOLVED" }
+      ],
+      "units": { "building_height": "m", "Ta": "s", "maximum_period": "s" },
+      "interpolation_method": null,
+      "boundary_behavior": null,
+      "formula_id": null,
+      "formula_expression": null,
+      "required_details": ["Formula Ta", "Lookup Ct dan x", "Semua limit yang berlaku", "Lookup koefisien limit", "Aturan periode maksimum", "Kondisi transisi dan referensi"],
+      "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "registry_key": "seismic.response-coefficient.cs",
+      "category": "SEISMIC_RESPONSE_COEFFICIENT",
+      "standard_id": "SNI 1726",
+      "standard_version": "2019",
+      "clause_or_table_reference": null,
+      "applicability": { "description": "Perhitungan Cs dan seluruh batas yang berlaku.", "conditions": ["Spektrum desain, periode, R, dan faktor kepentingan tersedia"] },
+      "inputs": [
+        { "name": "SDS", "description": "Parameter desain periode pendek.", "unit": "g", "value_status": "UNRESOLVED" },
+        { "name": "SD1", "description": "Parameter desain satu detik.", "unit": "g", "value_status": "UNRESOLVED" },
+        { "name": "T", "description": "Periode yang digunakan.", "unit": "s", "value_status": "UNRESOLVED" },
+        { "name": "R", "description": "Koefisien modifikasi respons.", "unit": "dimensionless", "value_status": "UNRESOLVED" },
+        { "name": "importance_parameter", "description": "Parameter kepentingan yang diwajibkan aturan.", "unit": "dimensionless", "value_status": "UNRESOLVED" },
+        { "name": "S1_or_other_limits", "description": "Parameter tambahan untuk batas/transisi.", "unit": "code-defined", "value_status": "UNRESOLVED" }
+      ],
+      "outputs": [{ "name": "Cs", "description": "Koefisien respons seismik governing.", "unit": "dimensionless", "value_status": "UNRESOLVED" }],
+      "units": { "SDS": "g", "SD1": "g", "T": "s", "R": "dimensionless", "Cs": "dimensionless" },
+      "interpolation_method": null,
+      "boundary_behavior": null,
+      "formula_id": null,
+      "formula_expression": null,
+      "required_details": ["Formula Cs utama", "Semua batas atas", "Semua batas bawah", "Kondisi transisi", "Aturan governing", "Parameter dan referensi setiap check"],
+      "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "registry_key": "seismic.base-shear.v",
+      "category": "BASE_SHEAR",
+      "standard_id": "SNI 1726",
+      "standard_version": "2019",
+      "clause_or_table_reference": null,
+      "applicability": { "description": "Perhitungan gaya geser dasar dari Cs dan W aktif.", "conditions": ["Cs governing valid", "W M5 berstatus AVAILABLE dan berasal dari revisi aktif"] },
+      "inputs": [
+        { "name": "Cs", "description": "Koefisien respons seismik governing.", "unit": "dimensionless", "value_status": "UNRESOLVED" },
+        { "name": "W", "description": "Berat seismik warisan M5.", "unit": "kN", "value_status": "DEFINED" }
+      ],
+      "outputs": [{ "name": "V", "description": "Gaya geser dasar.", "unit": "kN", "value_status": "UNRESOLVED" }],
+      "units": { "Cs": "dimensionless", "W": "kN", "V": "kN" },
+      "interpolation_method": null,
+      "boundary_behavior": null,
+      "formula_id": null,
+      "formula_expression": null,
+      "required_details": ["Formula V", "Referensi formula", "Konfirmasi W wajib diwarisi dari M5", "Perilaku bila W invalid/stale"],
+      "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": "W tersedia dari engine M5; hubungan formula masih menunggu persetujuan registry."
+    },
+    {
+      "registry_key": "seismic.story-force.vertical-distribution",
+      "category": "VERTICAL_STORY_FORCE_DISTRIBUTION",
+      "standard_id": "SNI 1726",
+      "standard_version": "2019",
+      "clause_or_table_reference": null,
+      "applicability": { "description": "Distribusi V menjadi Fx pada setiap story.", "conditions": ["V valid", "Berat dan tinggi setiap story tersedia"] },
+      "inputs": [
+        { "name": "V", "description": "Gaya geser dasar.", "unit": "kN", "value_status": "UNRESOLVED" },
+        { "name": "wi", "description": "Berat seismik story i dari M5.", "unit": "kN", "value_status": "DEFINED" },
+        { "name": "hi", "description": "Tinggi story i relatif level dasar.", "unit": "m", "value_status": "DEFINED" },
+        { "name": "T", "description": "Periode untuk penentuan k.", "unit": "s", "value_status": "UNRESOLVED" }
+      ],
+      "outputs": [
+        { "name": "k", "description": "Eksponen distribusi vertikal.", "unit": "dimensionless", "value_status": "UNRESOLVED" },
+        { "name": "Fx", "description": "Gaya lateral story x.", "unit": "kN", "value_status": "UNRESOLVED" }
+      ],
+      "units": { "V": "kN", "wi": "kN", "hi": "m", "T": "s", "k": "dimensionless", "Fx": "kN" },
+      "interpolation_method": null,
+      "boundary_behavior": null,
+      "formula_id": null,
+      "formula_expression": null,
+      "required_details": ["Aturan k untuk seluruh rentang periode", "Interpolasi k bila berlaku", "Formula koefisien distribusi", "Formula Fx", "Penanganan story dengan berat nol", "Check jumlah Fx terhadap V", "Referensi"],
+      "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "registry_key": "seismic.response-spectrum.generation",
+      "category": "RESPONSE_SPECTRUM_GENERATION",
+      "standard_id": "SNI 1726",
+      "standard_version": "2019",
+      "clause_or_table_reference": null,
+      "applicability": { "description": "Generasi tabel dan grafik response spectrum dari aturan piecewise yang disetujui.", "conditions": ["Parameter spektrum dan semua periode transisi tersedia"] },
+      "inputs": [
+        { "name": "SDS", "description": "Parameter desain periode pendek.", "unit": "g", "value_status": "UNRESOLVED" },
+        { "name": "SD1", "description": "Parameter desain satu detik.", "unit": "g", "value_status": "UNRESOLVED" },
+        { "name": "T0", "description": "Periode transisi awal.", "unit": "s", "value_status": "UNRESOLVED" },
+        { "name": "Ts", "description": "Periode transisi plateau.", "unit": "s", "value_status": "UNRESOLVED" },
+        { "name": "TL", "description": "Periode transisi panjang bila berlaku.", "unit": "s", "value_status": "UNRESOLVED" }
+      ],
+      "outputs": [
+        { "name": "period_points", "description": "Periode tabel spectrum.", "unit": "s", "value_status": "UNRESOLVED" },
+        { "name": "Sa_points", "description": "Ordinata spectrum untuk setiap periode.", "unit": "g", "value_status": "UNRESOLVED" }
+      ],
+      "units": { "T": "s", "Sa": "g" },
+      "interpolation_method": null,
+      "boundary_behavior": null,
+      "formula_id": null,
+      "formula_expression": null,
+      "required_details": ["Periode minimum/maksimum", "Semua segmen perhitungan", "Sampling strategy deterministik", "Inklusi tepat pada T0/Ts/TL", "Titik validasi wajib", "Toleransi numerik", "Referensi"],
+      "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "registry_key": "seismic.golden-fixtures.approved-suite",
+      "category": "GOLDEN_FIXTURES",
+      "standard_id": "SNI 1726",
+      "standard_version": "2019",
+      "clause_or_table_reference": null,
+      "applicability": { "description": "Suite verifikasi engineer untuk registry yang telah terisi.", "conditions": ["Seluruh aturan terkait berstatus APPROVED", "Fixture memakai registry version identik"] },
+      "inputs": [{ "name": "approved_case_inputs", "description": "Input kasus yang ditandatangani engineer.", "unit": "per-field", "value_status": "UNRESOLVED" }],
+      "outputs": [{ "name": "approved_expected_outputs", "description": "Output, unit, dan toleransi yang ditandatangani engineer.", "unit": "per-field", "value_status": "UNRESOLVED" }],
+      "units": { "fixture_values": "per-field", "tolerance": "per-field" },
+      "interpolation_method": null,
+      "boundary_behavior": null,
+      "formula_id": null,
+      "formula_expression": null,
+      "required_details": ["Fa/Fv exact, interpolation, dan boundary", "SDS/SD1", "KDS dan governing", "Eligibility allowed/conditional/blocked", "Parameter sistem", "Ta dan limit", "Cs semua kontrol", "V dengan W M5", "Fx dan keseimbangan gaya", "Ordinata spectrum pada seluruh transisi"],
+      "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    }
+  ]
+}

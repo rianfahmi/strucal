@@ -91,11 +91,12 @@ test("hasil M6 tersimpan pada revisi aktif dan perubahan upstream menginvalidasi
     ids("project-1", "revision-1"),
     () => "2026-09-28T00:00:00.000Z",
   );
-  const derived: SeismicResult = { status: "VALID", warnings: [], coefficients: null, spectrum: null, kds_review: null, system_eligibility: [], system_parameters: null, period: null, response_coefficient: null, seismic_weight: null, base_shear: null, story_forces: [], response_spectrum: [] };
-  const result = { ...initial.seismic, raw_inputs: { ss: 1, s1: 0.5, site_class: "TEST", risk_category: "TEST" }, derived_results: derived };
+  const derived: SeismicResult = { status: "VALID", warnings: [], coefficients: null, spectrum: null, kds_review: null, system_eligibility: [], system_parameters: null, period: null, response_coefficient: null, seismic_weight: null, base_shear: null, story_exponent: null, story_forces: [], response_spectrum: [] };
+  const provenance = Object.fromEntries(Object.keys(initial.seismic.input_provenance).map((key) => [key, { source: "PUSKIM", entered_by: "Engineer", status: "INPUT" as const, project_revision: initial.revision.id }])) as typeof initial.seismic.input_provenance;
+  const result = { ...initial.seismic, raw_inputs: { ss: 1, s1: 0.5, tl: 8, fa: 1, fv: 1, site_class: "SD", risk_category: "II" }, input_provenance: provenance, derived_results: derived };
   const saved = reviseSeismic(initial, result, "manual", ids("revision-2"), () => "2026-09-28T00:01:00.000Z");
   assert.equal(saved.seismic.revision_id, "revision-2");
-  assert.equal(saved.seismic.derived_results?.status, "REQUIRES_REGISTRY_DATA");
+  assert.equal(saved.seismic.derived_results?.status, "REQUIRES_SYSTEM_SELECTION");
   const changedGeometry = { ...saved.geometry, grid_x: saved.geometry.grid_x.map((line, index) => index === 1 ? { ...line, ordinate: 7 } : line) };
   const invalidated = reviseGeometry(saved, changedGeometry, "manual", ids("revision-3"), () => "2026-09-28T00:02:00.000Z");
   assert.equal(invalidated.seismic.derived_results, null);

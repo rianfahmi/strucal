@@ -2,7 +2,7 @@ import type { Project, ProjectBundle, ProjectRevision } from "./projects";
 import { createDefaultGeometry, type Geometry } from "./geometry";
 import { createDefaultMaterials, type Materials } from "./materials";
 import { createDefaultLoads, type Loads } from "./loads";
-import { createDefaultSeismic, type SeismicModel } from "./seismic";
+import { createDefaultSeismic, normalizeSeismic, type SeismicModel } from "./seismic";
 
 const DATABASE_NAME = "strucal";
 const DATABASE_VERSION = 5;
@@ -76,7 +76,7 @@ export async function getProjectBundle(projectId: string): Promise<ProjectBundle
       geometry: geometry ?? createDefaultGeometry(revision.id),
       materials: materials ?? createDefaultMaterials(revision.id),
       loads: loads ?? createDefaultLoads(revision.id, revision.registry_version),
-      seismic: seismic ?? createDefaultSeismic(revision.id, revision.registry_version),
+      seismic: seismic ? normalizeSeismic(seismic, revision.id, revision.registry_version) : createDefaultSeismic(revision.id, revision.registry_version),
     };
   } finally {
     database.close();

@@ -273,6 +273,19 @@ h1, h2, p { margin: 0; }
 .seismic-tabs button { padding: .65rem .7rem; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #66736e; cursor: pointer; font-size: .67rem; font-weight: 700; white-space: nowrap; }
 .seismic-tabs button.active { border-bottom-color: #1c594b; color: #174b3f; }
 .seismic-input-grid, .seismic-inherited, .trace-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.seismic-input-note { margin-bottom: .8rem; color: #65736d; font-size: .7rem; }
+.input-with-source select { width: 100%; min-width: 0; min-height: 2.55rem; padding: .5rem .65rem; border: 1px solid #cfd8d4; border-radius: .4rem 0 0 .4rem; background: #fff; color: #263730; }
+.input-with-source select:focus { border-color: #1c594b; outline: 3px solid #1c594b18; }
+.provenance-table { margin-top: 1rem; }
+.provenance-table input { width: 100%; min-width: 8rem; padding: .38rem .45rem; border: 1px solid #cfd8d4; border-radius: .3rem; }
+.provenance-table td { vertical-align: top; }
+.auto-calculated-list, .period-classification { display: grid; gap: .3rem; margin-top: 1rem; padding: .75rem; border: 1px solid #d8e4df; border-radius: .4rem; background: #f4f9f7; color: #53615c; font-size: .68rem; }
+.engineering-options { display: grid; gap: .5rem; margin-bottom: 1rem; padding: .8rem; border: 1px solid #dde4e1; border-radius: .4rem; }
+.engineering-options legend { padding: 0 .35rem; color: #53615c; font-size: .7rem; font-weight: 800; }
+.engineering-options > label { display: flex; align-items: center; gap: .45rem; color: #53615c; font-size: .68rem; }
+.engineering-options > label input { margin: 0; }
+.spectrum-display-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin-bottom: .8rem; }
+.spectrum-table { max-height: 24rem; overflow-y: auto; }
 .seismic-inherited { margin-top: 1rem; }
 .seismic-inherited article { display: grid; gap: .4rem; padding: .8rem; border: 1px solid #e0e6e3; border-radius: .4rem; background: #f8faf9; }
 .seismic-inherited span { color: #65736d; font-size: .68rem; }
