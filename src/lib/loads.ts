@@ -194,6 +194,7 @@ export function calculateSeismicWeight(loads: Loads, geometry: Geometry, registr
       unit: "kN", provenance: "CALCULATED",
     });
   }
+  if (!components.length) warnings.push("Belum ada assignment yang berkontribusi pada berat seismik.");
   const byStory = new Map<string, number>();
   components.forEach(({ story, weight }) => byStory.set(story, (byStory.get(story) ?? 0) + weight));
   return {

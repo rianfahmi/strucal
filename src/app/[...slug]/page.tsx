@@ -5,6 +5,7 @@ import { navigationItems } from "../../lib/navigation";
 import { ProjectData } from "../../components/project-data";
 import { GeometryWorkspace } from "../../components/geometry-workspace";
 import { MaterialWorkspace } from "../../components/material-workspace";
+import { LoadWorkspace } from "../../components/load-workspace";
 
 type PageProps = { params: Promise<{ slug: string[] }> };
 
@@ -29,6 +30,10 @@ export default async function ModulePage({ params }: PageProps) {
 
   if (item.href === "/material") {
     return <div className="page material-page"><header className="page-heading"><div><p className="eyebrow">Tahap 1 · Parameter Awal</p><h1>Material</h1><p className="page-description">Kelola properti beton dan tulangan dengan unit serta sumber nilai yang eksplisit.</p></div></header><MaterialWorkspace /></div>;
+  }
+
+  if (item.href === "/pembebanan") {
+    return <div className="page load-page"><header className="page-heading"><div><p className="eyebrow">Tahap 1 · Parameter Awal</p><h1>Pembebanan</h1><p className="page-description">Definisikan load, tetapkan ke geometri aktif, dan review berat seismik serta registry kombinasi.</p></div></header><LoadWorkspace /></div>;
   }
 
   return (

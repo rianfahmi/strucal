@@ -230,6 +230,43 @@ h1, h2, p { margin: 0; }
 .save-material { width: 100%; margin-top: .7rem; }
 .save-material:disabled { background: #a5b0ac; cursor: default; }
 
+.load-page { width: min(96rem, 100%); }
+.load-editor { min-width: 0; }
+.load-tabs { display: flex; gap: .15rem; margin: -1.15rem -1.15rem 1.15rem; padding: .7rem 1rem 0; overflow-x: auto; border-bottom: 1px solid #e3e8e6; background: #f8faf9; border-radius: .65rem .65rem 0 0; }
+.load-tabs button { padding: .65rem .7rem; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #66736e; cursor: pointer; font-size: .7rem; font-weight: 700; white-space: nowrap; }
+.load-tabs button.active { border-bottom-color: #1c594b; color: #174b3f; }
+.load-table { width: 100%; min-width: 48rem; border-collapse: collapse; color: #44534d; font-size: .68rem; }
+.load-definition-table { min-width: 76rem; }
+.load-table th { position: sticky; top: 0; z-index: 1; padding: .48rem .5rem; background: #f3f6f5; color: #65736d; font-size: .59rem; letter-spacing: .03em; text-align: left; text-transform: uppercase; }
+.load-table td { padding: .42rem .45rem; border-top: 1px solid #edf0ef; vertical-align: top; }
+.load-table input, .load-table select, .assignment-form input, .assignment-form select { width: 100%; min-width: 0; min-height: 2rem; padding: .3rem .42rem; border: 1px solid #d4dcd8; border-radius: .3rem; background: #fff; color: #293a34; font-size: .67rem; }
+.load-table td:first-child > input { margin-bottom: .25rem; }
+.load-table input:focus, .load-table select:focus, .assignment-form input:focus, .assignment-form select:focus { border-color: #1c594b; outline: 2px solid #1c594b16; }
+.compact-number { display: flex; min-width: 7.5rem; }
+.compact-number input { border-radius: .3rem 0 0 .3rem; }
+.compact-number span { display: grid; min-width: 3.2rem; place-items: center; padding: 0 .35rem; border: 1px solid #d4dcd8; border-left: 0; border-radius: 0 .3rem .3rem 0; background: #f5f7f6; color: #65736d; white-space: nowrap; }
+.assignment-form { display: grid; grid-template-columns: 1fr 1.5fr 1.5fr auto; gap: .65rem; align-items: end; margin-bottom: .8rem; padding: .75rem; border: 1px solid #e1e7e4; border-radius: .45rem; background: #f8faf9; }
+.assignment-form label { display: grid; gap: .3rem; color: #53615c; font-size: .65rem; font-weight: 700; }
+.assignment-form .button { min-height: 2rem; padding: .3rem .65rem; font-size: .68rem; }
+.table-empty { padding: 1rem; color: #77847f; font-size: .7rem; text-align: center; }
+.load-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem; margin-bottom: .8rem; }
+.load-kpis article { display: grid; min-height: 7rem; padding: .85rem; border: 1px solid #e0e6e3; border-radius: .45rem; background: #f9fbfa; }
+.load-kpis span { color: #65736d; font-size: .68rem; font-weight: 700; }
+.load-kpis strong { margin-top: .55rem; color: #20352e; font-size: 1.15rem; }
+.load-kpis small { margin-top: auto; color: #7a8782; font-size: .62rem; }
+.badge-inherited { background: #f0edf7; color: #655282; }
+.badge-calculated { background: #e8f2ee; color: #28604f; }
+.registry-review { padding: 1rem; border: 1px solid #ead7aa; border-radius: .45rem; background: #fff9eb; color: #74530f; }
+.registry-review strong { font-size: .72rem; }
+.registry-review p { margin-top: .35rem; font-size: .76rem; }
+.registry-review small { display: block; margin-top: .5rem; color: #876b31; font-size: .65rem; }
+.load-validation { display: grid; gap: .18rem; margin-top: 1rem; padding: .65rem .75rem; border-radius: .4rem; font-size: .68rem; }
+.load-validation strong { font-size: .72rem; }
+.load-validation.is-valid { border: 1px solid #cce1d8; background: #f0f8f4; color: #29614f; }
+.load-validation.has-error { border: 1px solid #ebcdcd; background: #fff5f5; color: #953d3d; }
+.save-loads { width: 100%; margin-top: .7rem; }
+.save-loads:disabled { background: #a5b0ac; cursor: default; }
+
 @media (max-width: 1050px) {
   .sidebar { width: 15.5rem; }
   .workspace { margin-left: 15.5rem; }
@@ -258,6 +295,8 @@ h1, h2, p { margin: 0; }
   .geometry-workspace { grid-template-columns: minmax(0, 1fr); }
   .material-form { grid-template-columns: 1fr; }
   .derived-property, .derived-property > div { align-items: flex-start; flex-direction: column; }
+  .assignment-form { grid-template-columns: 1fr; }
+  .load-kpis { grid-template-columns: 1fr; }
   .viewer-toolbar { align-items: flex-start; flex-direction: column; }
   .viewer-actions { width: 100%; flex-wrap: wrap; }
   .viewer-context { align-items: flex-start; flex-direction: column; }
