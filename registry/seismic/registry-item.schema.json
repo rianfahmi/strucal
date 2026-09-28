@@ -15,6 +15,7 @@
     "standard_id": { "type": "string", "minLength": 1 },
     "standard_version": { "type": "string", "minLength": 1 },
     "clause_or_table_reference": { "type": ["string", "null"] },
+    "source_pages": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true },
     "applicability": {
       "type": "object",
       "additionalProperties": false,
@@ -35,7 +36,9 @@
     "formula_id": { "type": ["string", "null"] },
     "formula_expression": { "type": ["string", "null"] },
     "required_details": { "type": "array", "items": { "type": "string" } },
-    "source_status": { "enum": ["UNRESOLVED", "PROJECT_APPROVED", "ENGINEER_PROVIDED"] },
+    "rule_data": { "type": "object" },
+    "data_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "source_status": { "enum": ["UNRESOLVED", "STANDARD_EXTRACTED", "PROJECT_APPROVED", "ENGINEER_PROVIDED"] },
     "approval_status": { "enum": ["DRAFT", "ENGINEER_REVIEW", "APPROVED", "REJECTED"] },
     "reviewed_by": { "type": ["string", "null"] },
     "reviewed_at": { "type": ["string", "null"], "format": "date-time" },

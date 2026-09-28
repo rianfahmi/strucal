@@ -24,7 +24,7 @@
     "inputs": { "type": "array", "items": { "$ref": "#/$defs/value" } },
     "expected_outputs": { "type": "array", "items": { "$ref": "#/$defs/value" } },
     "tolerances": { "type": "array", "items": { "$ref": "#/$defs/tolerance" } },
-    "source_status": { "enum": ["UNRESOLVED", "ENGINEER_PROVIDED"] },
+    "source_status": { "enum": ["UNRESOLVED", "STANDARD_DERIVED", "ENGINEER_PROVIDED"] },
     "approval_status": { "enum": ["DRAFT", "ENGINEER_REVIEW", "APPROVED", "REJECTED"] },
     "reviewed_by": { "type": ["string", "null"] },
     "reviewed_at": { "type": ["string", "null"], "format": "date-time" },
