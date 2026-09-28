@@ -1,0 +1,7 @@
+{
+  "registry_version": "TEST-ONLY-SEISMIC-1",
+  "registry_status": "TEST_ONLY_NOT_ENGINEER_APPROVED",
+  "tolerance": 1e-9,
+  "input": { "ss": 1, "s1": 0.5, "site_class": "TEST", "risk_category": "TEST", "height_m": 10, "weight_kN": 1000 },
+  "expected": { "sds_g": 1, "sd1_g": 0.5, "kds": "TEST-D", "ta_s": 1, "cs": 0.1, "base_shear_kN": 100, "story_force_kN": 100 }
+}
