@@ -6,6 +6,7 @@ import { ProjectData } from "../../components/project-data";
 import { GeometryWorkspace } from "../../components/geometry-workspace";
 import { MaterialWorkspace } from "../../components/material-workspace";
 import { LoadWorkspace } from "../../components/load-workspace";
+import { SeismicWorkspace } from "../../components/seismic-workspace";
 
 type PageProps = { params: Promise<{ slug: string[] }> };
 
@@ -34,6 +35,10 @@ export default async function ModulePage({ params }: PageProps) {
 
   if (item.href === "/pembebanan") {
     return <div className="page load-page"><header className="page-heading"><div><p className="eyebrow">Tahap 1 · Parameter Awal</p><h1>Pembebanan</h1><p className="page-description">Definisikan load, tetapkan ke geometri aktif, dan review berat seismik serta registry kombinasi.</p></div></header><LoadWorkspace /></div>;
+  }
+
+  if (item.href === "/analisa-gempa") {
+    return <div className="page seismic-page"><header className="page-heading"><div><p className="eyebrow">Tahap 1 · Parameter Awal</p><h1>Analisa Gempa</h1><p className="page-description">Input mentah, review KDS dan sistem struktur, lalu hasil seismik dengan trace perhitungan.</p></div></header><SeismicWorkspace /></div>;
   }
 
   return (
