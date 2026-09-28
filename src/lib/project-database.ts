@@ -2,9 +2,10 @@ import type { Project, ProjectBundle, ProjectRevision } from "./projects";
 import { createDefaultGeometry, type Geometry } from "./geometry";
 import { createDefaultMaterials, type Materials } from "./materials";
 import { createDefaultLoads, type Loads } from "./loads";
+import { createDefaultSeismic, type SeismicModel } from "./seismic";
 
 const DATABASE_NAME = "strucal";
-const DATABASE_VERSION = 4;
+const DATABASE_VERSION = 5;
 
 function requestResult<T>(request: IDBRequest<T>) {
   return new Promise<T>((resolve, reject) => {
@@ -34,6 +35,7 @@ function openDatabase() {
       if (!database.objectStoreNames.contains("geometries")) database.createObjectStore("geometries", { keyPath: "revision_id" });
       if (!database.objectStoreNames.contains("materials")) database.createObjectStore("materials", { keyPath: "revision_id" });
       if (!database.objectStoreNames.contains("loads")) database.createObjectStore("loads", { keyPath: "revision_id" });
+      if (!database.objectStoreNames.contains("seismic")) database.createObjectStore("seismic", { keyPath: "revision_id" });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("Database proyek tidak dapat dibuka."));
@@ -55,7 +57,7 @@ export async function listProjects() {
 export async function getProjectBundle(projectId: string): Promise<ProjectBundle | null> {
   const database = await openDatabase();
   try {
-    const transaction = database.transaction(["projects", "project_revisions", "geometries", "materials", "loads"], "readonly");
+    const transaction = database.transaction(["projects", "project_revisions", "geometries", "materials", "loads", "seismic"], "readonly");
     const project = await requestResult(transaction.objectStore("projects").get(projectId) as IDBRequest<Project | undefined>);
     if (!project) {
       await transactionDone(transaction);
@@ -65,6 +67,7 @@ export async function getProjectBundle(projectId: string): Promise<ProjectBundle
     const geometry = await requestResult(transaction.objectStore("geometries").get(project.active_revision_id) as IDBRequest<Geometry | undefined>);
     const materials = await requestResult(transaction.objectStore("materials").get(project.active_revision_id) as IDBRequest<Materials | undefined>);
     const loads = await requestResult(transaction.objectStore("loads").get(project.active_revision_id) as IDBRequest<Loads | undefined>);
+    const seismic = await requestResult(transaction.objectStore("seismic").get(project.active_revision_id) as IDBRequest<SeismicModel | undefined>);
     await transactionDone(transaction);
     if (!revision) throw new Error("Revisi aktif proyek tidak ditemukan.");
     return {
@@ -73,6 +76,7 @@ export async function getProjectBundle(projectId: string): Promise<ProjectBundle
       geometry: geometry ?? createDefaultGeometry(revision.id),
       materials: materials ?? createDefaultMaterials(revision.id),
       loads: loads ?? createDefaultLoads(revision.id, revision.registry_version),
+      seismic: seismic ?? createDefaultSeismic(revision.id, revision.registry_version),
     };
   } finally {
     database.close();
@@ -82,11 +86,12 @@ export async function getProjectBundle(projectId: string): Promise<ProjectBundle
 export async function persistProjectBundle(bundle: ProjectBundle) {
   const database = await openDatabase();
   try {
-    const transaction = database.transaction(["projects", "project_revisions", "geometries", "materials", "loads"], "readwrite");
+    const transaction = database.transaction(["projects", "project_revisions", "geometries", "materials", "loads", "seismic"], "readwrite");
     transaction.objectStore("project_revisions").add(bundle.revision);
     transaction.objectStore("geometries").put(bundle.geometry);
     transaction.objectStore("materials").put(bundle.materials);
     transaction.objectStore("loads").put(bundle.loads);
+    transaction.objectStore("seismic").put(bundle.seismic);
     transaction.objectStore("projects").put(bundle.project);
     await transactionDone(transaction);
   } finally {

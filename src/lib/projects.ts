@@ -2,6 +2,7 @@ import { createDefaultGeometry, validateGeometry, type Geometry } from "./geomet
 import { createDefaultMaterials, validateMaterials, type Materials } from "./materials.ts";
 import { createDefaultLoads, validateLoads, type Loads } from "./loads.ts";
 import { getCombinationRegistry } from "./load-registry.ts";
+import { createDefaultSeismic, type SeismicModel } from "./seismic.ts";
 
 export const REGISTRY_VERSION = "SNI-1726:2019|SNI-1727:2020|SNI-2847:2019";
 export const ENGINE_VERSION = "0.0.0";
@@ -34,7 +35,7 @@ export type ProjectRevision = {
   save_reason: SaveReason;
 };
 
-export type ProjectBundle = { project: Project; revision: ProjectRevision; geometry: Geometry; materials: Materials; loads: Loads };
+export type ProjectBundle = { project: Project; revision: ProjectRevision; geometry: Geometry; materials: Materials; loads: Loads; seismic: SeismicModel };
 export type ProjectInput = Pick<Project, "title" | "location" | "function" | "owner">;
 
 export function createProjectBundle(
@@ -69,6 +70,7 @@ export function createProjectBundle(
     geometry: createDefaultGeometry(revisionId),
     materials: createDefaultMaterials(revisionId),
     loads: createDefaultLoads(revisionId, REGISTRY_VERSION),
+    seismic: createDefaultSeismic(revisionId, REGISTRY_VERSION),
   };
 }
 
@@ -97,6 +99,7 @@ export function reviseProject(
     geometry: { ...current.geometry, revision_id: revisionId },
     materials: { ...current.materials, revision_id: revisionId },
     loads: reviseLoadIds(current.loads, revisionId),
+    seismic: reviseSeismicId(current.seismic, revisionId, false),
   };
 }
 
@@ -127,6 +130,7 @@ export function reviseGeometry(
     geometry: { ...geometry, revision_id: revisionId },
     materials: { ...current.materials, revision_id: revisionId },
     loads: reviseLoadIds(current.loads, revisionId),
+    seismic: reviseSeismicId(current.seismic, revisionId, true),
   };
 }
 
@@ -157,6 +161,7 @@ export function reviseMaterials(
     geometry: { ...current.geometry, revision_id: revisionId },
     materials: { ...materials, revision_id: revisionId },
     loads: reviseLoadIds(current.loads, revisionId),
+    seismic: reviseSeismicId(current.seismic, revisionId, true),
   };
 }
 
@@ -187,6 +192,31 @@ export function reviseLoads(
     geometry: { ...current.geometry, revision_id: revisionId },
     materials: { ...current.materials, revision_id: revisionId },
     loads: reviseLoadIds(loads, revisionId),
+    seismic: reviseSeismicId(current.seismic, revisionId, true),
+  };
+}
+
+export function reviseSeismic(
+  current: ProjectBundle,
+  seismic: SeismicModel,
+  reason: Exclude<SaveReason, "create">,
+  id: () => string = () => crypto.randomUUID(),
+  now: () => string = () => new Date().toISOString(),
+): ProjectBundle {
+  if (seismic.registry_version !== current.revision.registry_version) throw new Error("Versi registry seismik tidak sama dengan revisi proyek.");
+  const createdAt = now();
+  const revisionId = id();
+  return {
+    project: { ...current.project, active_revision_id: revisionId, updated_at: createdAt },
+    revision: {
+      id: revisionId, project_id: current.project.id, revision_number: current.revision.revision_number + 1,
+      registry_version: current.revision.registry_version, engine_version: ENGINE_VERSION, created_at: createdAt,
+      frozen_at: null, source_revision_id: current.revision.id, save_reason: reason,
+    },
+    geometry: { ...current.geometry, revision_id: revisionId },
+    materials: { ...current.materials, revision_id: revisionId },
+    loads: reviseLoadIds(current.loads, revisionId),
+    seismic: reviseSeismicId(seismic, revisionId, false),
   };
 }
 
@@ -197,6 +227,10 @@ function reviseLoadIds(loads: Loads, revisionId: string): Loads {
     definitions: loads.definitions.map((definition) => ({ ...definition, revision_id: revisionId })),
     assignments: loads.assignments.map((assignment) => ({ ...assignment, revision_id: revisionId })),
   };
+}
+
+function reviseSeismicId(seismic: SeismicModel, revisionId: string, invalidate: boolean): SeismicModel {
+  return { ...seismic, revision_id: revisionId, derived_results: invalidate ? null : seismic.derived_results };
 }
 
 export function sameProjectInput(project: Project, input: ProjectInput) {

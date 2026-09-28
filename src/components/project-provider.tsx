@@ -2,10 +2,11 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getProjectBundle, listProjects, persistProjectBundle } from "../lib/project-database";
-import { createProjectBundle, reviseGeometry, reviseLoads, reviseMaterials, reviseProject, sameProjectInput, type Project, type ProjectBundle, type ProjectInput } from "../lib/projects";
+import { createProjectBundle, reviseGeometry, reviseLoads, reviseMaterials, reviseProject, reviseSeismic, sameProjectInput, type Project, type ProjectBundle, type ProjectInput } from "../lib/projects";
 import { sameGeometry, type Geometry } from "../lib/geometry";
 import { sameMaterials, type Materials } from "../lib/materials";
 import { sameLoads, type Loads } from "../lib/loads";
+import { sameSeismic, type SeismicModel } from "../lib/seismic";
 
 export type SaveStatus = "loading" | "saved" | "saving" | "unsaved" | "error";
 type ProjectContextValue = {
@@ -18,6 +19,7 @@ type ProjectContextValue = {
   saveGeometry: (geometry: Geometry, reason: "manual" | "autosave") => Promise<void>;
   saveMaterials: (materials: Materials, reason: "manual" | "autosave") => Promise<void>;
   saveLoads: (loads: Loads, reason: "manual" | "autosave") => Promise<void>;
+  saveSeismic: (seismic: SeismicModel, reason: "manual" | "autosave") => Promise<void>;
   markUnsaved: () => void;
 };
 
@@ -167,7 +169,29 @@ export function ProjectProvider({ children }: Readonly<{ children: React.ReactNo
     await queue.current;
   }, [applyActive]);
 
-  return <ProjectContext.Provider value={{ projects, active, saveStatus, createProject, selectProject, saveProject, saveGeometry, saveMaterials, saveLoads, markUnsaved: () => setSaveStatus("unsaved") }}>{children}</ProjectContext.Provider>;
+  const saveSeismic = useCallback(async (seismic: SeismicModel, reason: "manual" | "autosave") => {
+    queue.current = queue.current.then(async () => {
+      const current = activeRef.current;
+      if (!current || sameSeismic(current.seismic, seismic)) {
+        setSaveStatus("saved");
+        return;
+      }
+      setSaveStatus("saving");
+      try {
+        const next = reviseSeismic(current, seismic, reason);
+        await persistProjectBundle(next);
+        applyActive(next);
+        setProjects((items) => [next.project, ...items.filter(({ id }) => id !== next.project.id)]);
+        setSaveStatus("saved");
+      } catch (error) {
+        console.error("Gagal menyimpan analisa gempa", error);
+        setSaveStatus("error");
+      }
+    });
+    await queue.current;
+  }, [applyActive]);
+
+  return <ProjectContext.Provider value={{ projects, active, saveStatus, createProject, selectProject, saveProject, saveGeometry, saveMaterials, saveLoads, saveSeismic, markUnsaved: () => setSaveStatus("unsaved") }}>{children}</ProjectContext.Provider>;
 }
 
 export function useProjects() {

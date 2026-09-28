@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createProjectBundle, reviseGeometry, reviseLoads, reviseProject } from "../src/lib/projects.ts";
+import { createProjectBundle, reviseGeometry, reviseLoads, reviseProject, reviseSeismic } from "../src/lib/projects.ts";
+import type { SeismicResult } from "../src/lib/seismic.ts";
 
 const ids = (...values: string[]) => {
   let index = 0;
@@ -41,6 +42,7 @@ test("save creates traceable revision metadata and preserves the project id", ()
   assert.equal(saved.revision.save_reason, "autosave");
   assert.equal(saved.geometry.revision_id, "revision-2");
   assert.equal(saved.loads.revision_id, "revision-2");
+  assert.equal(saved.seismic.revision_id, "revision-2");
 });
 
 test("geometry save creates a revision and rejects invalid geometry", () => {
@@ -81,4 +83,21 @@ test("load save creates a revision and updates all nested load revision referenc
   assert.equal(saved.geometry.revision_id, "revision-2");
   assert.equal(saved.materials.revision_id, "revision-2");
   assert.throws(() => reviseLoads(initial, initial.loads, "manual"), /Nilai load/);
+});
+
+test("hasil M6 tersimpan pada revisi aktif dan perubahan upstream menginvalidasinya", () => {
+  const initial = createProjectBundle(
+    { title: "Gedung A", location: "", function: "", owner: "" },
+    ids("project-1", "revision-1"),
+    () => "2026-09-28T00:00:00.000Z",
+  );
+  const derived: SeismicResult = { status: "REQUIRES_REGISTRY_DATA", warnings: ["missing"], coefficients: null, spectrum: null, kds_review: null, system_eligibility: [], system_parameters: null, period: null, response_coefficient: null, seismic_weight: null, base_shear: null, story_forces: [], response_spectrum: [] };
+  const result = { ...initial.seismic, raw_inputs: { ss: 1, s1: 0.5, site_class: "TEST", risk_category: "TEST" }, derived_results: derived };
+  const saved = reviseSeismic(initial, result, "manual", ids("revision-2"), () => "2026-09-28T00:01:00.000Z");
+  assert.equal(saved.seismic.revision_id, "revision-2");
+  assert.equal(saved.seismic.derived_results?.status, "REQUIRES_REGISTRY_DATA");
+  const changedGeometry = { ...saved.geometry, grid_x: saved.geometry.grid_x.map((line, index) => index === 1 ? { ...line, ordinate: 7 } : line) };
+  const invalidated = reviseGeometry(saved, changedGeometry, "manual", ids("revision-3"), () => "2026-09-28T00:02:00.000Z");
+  assert.equal(invalidated.seismic.derived_results, null);
+  assert.equal(invalidated.seismic.raw_inputs.ss, 1);
 });
