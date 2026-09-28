@@ -1,7 +1,9 @@
 {
   "registry_id": "strucal-m6-sni-1726-2019",
-  "registry_version": "SNI-1726:2019-pdf-engineer-review-2026-09-28",
-  "status": "ENGINEER_REVIEW",
+  "registry_version": "SNI-1726:2019-M6-V1-approved-2026-09-28",
+  "status": "APPROVED_M6_V1",
+  "approved_entries": 12,
+  "future_scope_entries": 1,
   "item_schema": "./registry-item.schema.json",
   "source_page_numbering": "Nomor halaman tercetak pada standar, bukan indeks halaman PDF.",
   "entries": [
@@ -25,9 +27,9 @@
         "importance_factors": {"I":1.0,"II":1.0,"III":1.25,"IV":1.5}
       },
       "source_status": "STANDARD_EXTRACTED",
-      "approval_status": "ENGINEER_REVIEW",
-      "reviewed_by": null,
-      "reviewed_at": null,
+      "approval_status": "APPROVED",
+      "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+      "reviewed_at": "2026-09-28T00:00:00Z",
       "source_note": "Deskripsi pemanfaatan lengkap tetap dirujuk ke Tabel 3; registry tidak menggantikan penetapan kategori oleh engineer."
     },
     {
@@ -86,16 +88,17 @@
       "inputs": [{"name":"site_class","description":"SA-SF.","unit":null,"value_status":"DEFINED"},{"name":"Ss","description":"Parameter MCE_R terpetakan periode 0,2 s.","unit":"g","value_status":"DEFINED"}],
       "outputs": [{"name":"Fa","description":"Koefisien situs periode pendek.","unit":"dimensionless","value_status":"DEFINED"}],
       "units": {"Ss":"g","Fa":"dimensionless"},
-      "interpolation_method": "UNRESOLVED: Tabel 6 dan 6.2 pada sumber tidak menyatakan aturan untuk Ss di antara kolom.",
+      "interpolation_method": "NOT_APPLICABLE_M6_V1: Fa adalah input engineer/PUSKIM; lookup dan interpolasi tidak dijalankan.",
       "boundary_behavior": "Kolom pertama berlaku Ss <=0,25; kolom terakhir berlaku Ss >=1,5; titik 0,5/0,75/1,0/1,25 eksplisit.",
       "formula_id": "SNI1726-2019-T6",
       "formula_expression": "Fa = table6(site_class, Ss)",
       "rule_data": {"axis_Ss_g":[{"condition":"<=","value":0.25},{"condition":"=","value":0.5},{"condition":"=","value":0.75},{"condition":"=","value":1.0},{"condition":"=","value":1.25},{"condition":">=","value":1.5}],"rows":{"SA":[0.8,0.8,0.8,0.8,0.8,0.8],"SB":[0.9,0.9,0.9,0.9,0.9,0.9],"SC":[1.3,1.3,1.2,1.2,1.2,1.2],"SD":[1.6,1.4,1.2,1.1,1.0,1.0],"SE":[2.4,1.7,1.3,1.1,0.9,0.8],"SF":"SITE_SPECIFIC"},"default_SE_minimum_Fa":1.2},
       "source_status": "STANDARD_EXTRACTED",
-      "approval_status": "ENGINEER_REVIEW",
-      "reviewed_by": null,
-      "reviewed_at": null,
-      "source_note": "Tidak ada interpolasi yang ditambahkan."
+      "approval_status": "APPROVED",
+      "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+      "reviewed_at": "2026-09-28T00:00:00Z",
+      "policy_status": "ENGINEER_APPROVED_POLICY",
+      "source_note": "M6 V1 menyimpan tabel sebagai referensi; Fa wajib input engineer/PUSKIM dengan provenance dan tidak dihitung otomatis."
     },
     {
       "registry_key": "seismic.site.fv",
@@ -108,16 +111,17 @@
       "inputs": [{"name":"site_class","description":"SA-SF.","unit":null,"value_status":"DEFINED"},{"name":"S1","description":"Parameter MCE_R terpetakan periode 1 s.","unit":"g","value_status":"DEFINED"}],
       "outputs": [{"name":"Fv","description":"Koefisien situs periode 1 s.","unit":"dimensionless","value_status":"DEFINED"}],
       "units": {"S1":"g","Fv":"dimensionless"},
-      "interpolation_method": "UNRESOLVED: Tabel 7 dan 6.2 pada sumber tidak menyatakan aturan untuk S1 di antara kolom.",
+      "interpolation_method": "NOT_APPLICABLE_M6_V1: Fv adalah input engineer/PUSKIM; lookup dan interpolasi tidak dijalankan.",
       "boundary_behavior": "Kolom pertama berlaku S1 <=0,1; kolom terakhir berlaku S1 >=0,6; titik 0,2/0,3/0,4/0,5 eksplisit.",
       "formula_id": "SNI1726-2019-T7",
       "formula_expression": "Fv = table7(site_class, S1)",
       "rule_data": {"axis_S1_g":[{"condition":"<=","value":0.1},{"condition":"=","value":0.2},{"condition":"=","value":0.3},{"condition":"=","value":0.4},{"condition":"=","value":0.5},{"condition":">=","value":0.6}],"rows":{"SA":[0.8,0.8,0.8,0.8,0.8,0.8],"SB":[0.8,0.8,0.8,0.8,0.8,0.8],"SC":[1.5,1.5,1.5,1.5,1.5,1.4],"SD":[2.4,2.2,2.0,1.9,1.8,1.7],"SE":[4.2,3.3,2.8,2.4,2.2,2.0],"SF":"SITE_SPECIFIC"}},
       "source_status": "STANDARD_EXTRACTED",
-      "approval_status": "ENGINEER_REVIEW",
-      "reviewed_by": null,
-      "reviewed_at": null,
-      "source_note": "Tidak ada interpolasi yang ditambahkan."
+      "approval_status": "APPROVED",
+      "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+      "reviewed_at": "2026-09-28T00:00:00Z",
+      "policy_status": "ENGINEER_APPROVED_POLICY",
+      "source_note": "M6 V1 menyimpan tabel sebagai referensi; Fv wajib input engineer/PUSKIM dengan provenance dan tidak dihitung otomatis."
     },
     {
       "registry_key": "seismic.spectrum.design",
@@ -136,9 +140,9 @@
       "formula_expression": "SMS=Fa*Ss; SM1=Fv*S1; SDS=(2/3)*SMS; SD1=(2/3)*SM1; T0=0.2*SD1/SDS; Ts=SD1/SDS; Sa=SDS*(0.4+0.6*T/T0) if T<T0; Sa=SDS if T0<=T<=Ts; Sa=SD1/T if Ts<T<=TL; Sa=SD1*TL/T^2 if T>TL",
       "rule_data": {"TL_map":{"figure":"Gambar 20","values_s":[6,8,12,16,20],"geospatial_lookup":"ENGINEER_REVIEW_REQUIRED; batas wilayah berupa peta raster, bukan tabel koordinat"},"segments":[{"condition":"T < T0","equation":11},{"condition":"T0 <= T <= Ts","expression":"Sa=SDS"},{"condition":"Ts < T <= TL","equation":12},{"condition":"T > TL","equation":13}]},
       "source_status": "STANDARD_EXTRACTED",
-      "approval_status": "ENGINEER_REVIEW",
-      "reviewed_by": null,
-      "reviewed_at": null,
+      "approval_status": "APPROVED",
+      "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+      "reviewed_at": "2026-09-28T00:00:00Z",
       "source_note": "Nilai TL individual belum boleh dipilih otomatis tanpa lokasi dan interpretasi engineer atas Gambar 20."
     },
     {
@@ -162,9 +166,9 @@
         "table8_only_conditions":["Ta < 0,8 Ts pada kedua arah ortogonal","Periode untuk simpangan antar tingkat < Ts pada kedua arah","Persamaan (31) dipakai untuk Cs","Diafragma kaku, atau bila fleksibel jarak antar elemen vertikal pemikul gaya seismik <=12 m"]
       },
       "source_status": "STANDARD_EXTRACTED",
-      "approval_status": "ENGINEER_REVIEW",
-      "reviewed_by": null,
-      "reviewed_at": null,
+      "approval_status": "APPROVED",
+      "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+      "reviewed_at": "2026-09-28T00:00:00Z",
       "source_note": null
     },
     {
@@ -185,10 +189,11 @@
       "data_refs": ["./sni-1726-2019.table-12.systems.json"],
       "rule_data": {"row_count":85,"kds_columns":["B","C","D","E","F"],"decision":{"TB":"ALLOWED unless another clause governs","numeric":"ALLOWED if hn<=limit; BLOCKED if hn>limit","TI":"BLOCKED","footnote_or_special_rule":"CONDITIONAL until verified"}},
       "source_status": "STANDARD_EXTRACTED",
-      "approval_status": "ENGINEER_REVIEW",
-      "reviewed_by": null,
-      "reviewed_at": null,
-      "source_note": "Seluruh 85 baris, catatan a-p, dan aturan khusus 7.2.5 tersimpan pada data_ref; konflik pembulatan batas tinggi ditandai untuk review."
+      "approval_status": "APPROVED",
+      "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+      "reviewed_at": "2026-09-28T00:00:00Z",
+      "policy_status": "ENGINEER_APPROVED_POLICY",
+      "source_note": "Seluruh 85 baris dan catatan a-p tersimpan pada data_ref; 7.2.5.4 memakai interpretasi engineer-approved 50→75 m (D/E) dan 30→50 m (F) hanya bila seluruh kondisi dipenuhi."
     },
     {
       "registry_key": "seismic.system.parameters",
@@ -208,10 +213,11 @@
       "data_refs": ["./sni-1726-2019.table-12.systems.json"],
       "rule_data": {"period_parameters":[{"type":"Rangka baja pemikul momen yang memenuhi syarat uraian Tabel 18","Ct":0.0724,"x":0.8},{"type":"Rangka beton pemikul momen yang memenuhi syarat uraian Tabel 18","Ct":0.0466,"x":0.9},{"type":"Rangka baja dengan bresing eksentris","Ct":0.0731,"x":0.75},{"type":"Rangka baja dengan bresing terkekang terhadap tekuk","Ct":0.0731,"x":0.75},{"type":"Semua sistem struktur lainnya","Ct":0.0488,"x":0.75}]},
       "source_status": "STANDARD_EXTRACTED",
-      "approval_status": "ENGINEER_REVIEW",
-      "reviewed_by": null,
-      "reviewed_at": null,
-      "source_note": "Ct/x bukan kolom Tabel 12; pemetaan otomatis antar tabel belum disetujui dan tidak diinferensikan diam-diam."
+      "approval_status": "APPROVED",
+      "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+      "reviewed_at": "2026-09-28T00:00:00Z",
+      "policy_status": "ENGINEER_APPROVED_POLICY",
+      "source_note": "Ct/x diklasifikasikan dengan aturan Tabel 18 yang disetujui; rangka momen wajib memenuhi kedua kondisi, selain itu memakai kategori semua sistem lainnya."
     },
     {
       "registry_key": "seismic.period.approximate",
@@ -224,16 +230,17 @@
       "inputs": [{"name":"hn","description":"Tinggi struktur di atas dasar ke tingkat tertinggi.","unit":"m","value_status":"DEFINED"},{"name":"Ct","description":"Tabel 18.","unit":"s/m^x","value_status":"DEFINED"},{"name":"x","description":"Tabel 18.","unit":"dimensionless","value_status":"DEFINED"},{"name":"SD1","description":"Untuk Cu.","unit":"g","value_status":"DEFINED"}],
       "outputs": [{"name":"Ta","description":"Periode fundamental pendekatan.","unit":"s","value_status":"DEFINED"},{"name":"Cu","description":"Koefisien batas atas.","unit":"dimensionless","value_status":"DEFINED"},{"name":"Tmax","description":"Batas periode analitis.","unit":"s","value_status":"DEFINED"}],
       "units": {"hn":"m","Ct":"s/m^x","x":"dimensionless","SD1":"g","Ta":"s","Cu":"dimensionless","Tmax":"s"},
-      "interpolation_method": "UNRESOLVED: Tabel 17 tidak menyatakan aturan Cu untuk SD1 di antara titik 0,1; 0,15; 0,2; 0,3; 0,4.",
-      "boundary_behavior": "Cu=1,4 untuk SD1>=0,4; Cu=1,7 untuk SD1<=0,1; nilai tepat 0,15/0,2/0,3 eksplisit.",
+      "interpolation_method": "ENGINEER_APPROVED_POLICY: interpolasi linier pada 0,10<SD1<0,15; 0,15<SD1<0,20; dan 0,20<SD1<0,30.",
+      "boundary_behavior": "Cu=1,70 untuk SD1<=0,10; Cu=1,60 pada 0,15; Cu=1,50 pada 0,20; Cu=1,40 untuk SD1>=0,30; presisi penuh dipertahankan.",
       "formula_id": "SNI1726-2019-EQ36-39-T17-T18",
       "formula_expression": "Ta=Ct*hn^x; Tmax=Cu*Ta; alternatif Ta=0.1*N; alternatif dinding: Ta=0.00058*hn/sqrt(Cw) dengan Cw menurut Eq39",
       "rule_data": {"Cu_table":[{"range":"SD1 >= 0.4","Cu":1.4},{"SD1":0.3,"Cu":1.4},{"SD1":0.2,"Cu":1.5},{"SD1":0.15,"Cu":1.6},{"range":"SD1 <= 0.1","Cu":1.7}],"table18_ref":"seismic.system.parameters.rule_data.period_parameters","alternatives":[{"equation":37,"expression":"Ta=0.1*N","conditions":["N<=12","seluruh sistem rangka momen beton atau seluruhnya baja","tinggi tingkat rata-rata >=3 m"]},{"equations":[38,39],"expression":"Ta=0.00058*hn/sqrt(Cw)","conditions":["dinding geser batu bata atau beton","hn<=36.6 m"]}]},
       "source_status": "STANDARD_EXTRACTED",
-      "approval_status": "ENGINEER_REVIEW",
-      "reviewed_by": null,
-      "reviewed_at": null,
-      "source_note": "Tidak ada interpolasi Cu yang ditambahkan."
+      "approval_status": "APPROVED",
+      "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+      "reviewed_at": "2026-09-28T00:00:00Z",
+      "policy_status": "ENGINEER_APPROVED_POLICY",
+      "source_note": "Nilai titik berasal dari Tabel 17; perilaku antar titik adalah kebijakan engineer-approved M6 V1."
     },
     {
       "registry_key": "seismic.response-coefficient.cs",
@@ -252,9 +259,9 @@
       "formula_expression": "Cs31=SDS/(R/Ie); cap32=SD1/(T*(R/Ie)) for T<=TL; cap33=SD1*TL/(T^2*(R/Ie)) for T>TL; lower34=max(0.044*SDS*Ie,0.01); lower35=0.5*S1/(R/Ie) when S1>=0.6",
       "rule_data": {"governing_constraints":["Cs ditentukan Eq31","Cs tidak perlu melebihi cap Eq32 atau Eq33 yang berlaku","Cs tidak boleh kurang dari kedua batas Eq34","Jika S1>=0,6g, Cs juga tidak boleh kurang dari Eq35"]},
       "source_status": "STANDARD_EXTRACTED",
-      "approval_status": "ENGINEER_REVIEW",
-      "reviewed_by": null,
-      "reviewed_at": null,
+      "approval_status": "APPROVED",
+      "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+      "reviewed_at": "2026-09-28T00:00:00Z",
       "source_note": "Opsi maksimum SDS pada 7.8.1.3 tidak diaktifkan; bila akan dipakai, seluruh enam syaratnya wajib diregistry terpisah."
     },
     {
@@ -274,9 +281,9 @@
       "formula_expression": "V=Cs*W",
       "rule_data": {"W_source":"M5 active revision","W_reference":"7.7.2"},
       "source_status": "STANDARD_EXTRACTED",
-      "approval_status": "ENGINEER_REVIEW",
-      "reviewed_by": null,
-      "reviewed_at": null,
+      "approval_status": "APPROVED",
+      "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+      "reviewed_at": "2026-09-28T00:00:00Z",
       "source_note": "Komposisi W sudah menjadi tanggung jawab engine M5; registry M6 hanya memverifikasi asal/revisi dan memakai nilai aktif."
     },
     {
@@ -296,9 +303,9 @@
       "formula_expression": "Cvx=(wx*hx^k)/sum_i(wi*hi^k); Fx=Cvx*V; k_linear=1+(T-0.5)/2 for 0.5<T<2.5",
       "rule_data": {"k_rules":[{"condition":"T <= 0.5","k":1},{"condition":"0.5 < T < 2.5","options":[{"k":2},{"expression":"1+(T-0.5)/2"}]},{"condition":"T >= 2.5","k":2}],"validation":"sum(Fx)=V within numeric tolerance"},
       "source_status": "STANDARD_EXTRACTED",
-      "approval_status": "ENGINEER_REVIEW",
-      "reviewed_by": null,
-      "reviewed_at": null,
+      "approval_status": "APPROVED",
+      "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+      "reviewed_at": "2026-09-28T00:00:00Z",
       "source_note": "Pilihan k=2 versus interpolasi harus direkam sebagai provenance."
     },
     {
@@ -316,22 +323,27 @@
       "boundary_behavior": "Masukkan tepat T=0, T0, Ts, dan TL; gunakan kondisi segmen 6.4 tanpa celah/tumpang tindih.",
       "formula_id": "SNI1726-2019-EQ11-13-SAMPLING",
       "formula_expression": "Sa(T) mengikuti seismic.spectrum.design; evaluasi langsung pada setiap T sampling",
-      "rule_data": {"required_validation_points":["T=0 -> Sa=0.4*SDS","T=T0 -> Sa=SDS","T=Ts -> Sa=SDS=SD1/Ts","T=TL -> Sa=SD1/TL","Satu titik interior tiap segmen"],"sampling_period_min_s":0,"sampling_period_max_s":"UNRESOLVED_NOT_PRESCRIBED_BY_6.4","sampling_step_s":"UNRESOLVED_NOT_PRESCRIBED_BY_6.4"},
+      "rule_data": {"required_validation_points":["T=0 -> Sa=0.4*SDS","T=T0 -> Sa=SDS","T=Ts -> Sa=SDS=SD1/Ts","T=TL -> Sa=SD1/TL","Satu titik interior tiap segmen"],"sampling_period_min_s":0,"sampling_period_max_s":6,"sampling_step_s":0.01,"mandatory_points":["0","T0","Ts","TL if TL is within display range"],"sampling_role":"presentation/export only"},
       "source_status": "STANDARD_EXTRACTED",
-      "approval_status": "ENGINEER_REVIEW",
-      "reviewed_by": null,
-      "reviewed_at": null,
-      "source_note": "SNI mendefinisikan kurva kontinu, bukan rentang/step tabel digital; kebijakan sampling harus disetujui engineer sebagai aturan proyek."
+      "approval_status": "APPROVED",
+      "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+      "reviewed_at": "2026-09-28T00:00:00Z",
+      "policy_status": "ENGINEER_APPROVED_POLICY",
+      "source_note": "Fungsi Sa(T) tetap kontinu; rentang 0-6 s dan step 0,01 s hanya kebijakan presentasi/export M6 V1 dan tidak mengatur perhitungan engineering."
     }
   ],
-  "unresolved_review_items": [
-    {"id":"FA_INTERPOLATION","reason":"6.2/Tabel 6 tidak menyatakan aturan interpolasi antar kolom."},
-    {"id":"FV_INTERPOLATION","reason":"6.2/Tabel 7 tidak menyatakan aturan interpolasi antar kolom."},
-    {"id":"SITE_CLASS_SHARED_BOUNDARIES","reason":"Tabel 5 memakai frasa 'sampai' pada batas bersama; operator implementasi perlu keputusan engineer."},
-    {"id":"TL_GEOSPATIAL_LOOKUP","reason":"Gambar 20 adalah peta raster; batas wilayah belum didigitalkan/divalidasi."},
-    {"id":"TABLE12_HEIGHT_ROUNDING","reason":"Angka 48/30 m, catatan 72/48 m, dan teks 50->75/30->50 m harus direkonsiliasi engineer."},
-    {"id":"TABLE12_TO_TABLE18_MAPPING","reason":"Pemetaan system_id ke tipe Ct/x belum dinyatakan sebagai tabel korespondensi oleh standar."},
-    {"id":"CU_INTERPOLATION","reason":"Tabel 17 tidak menyatakan aturan interpolasi antar titik SD1."},
-    {"id":"SPECTRUM_SAMPLING","reason":"6.4 tidak menetapkan periode maksimum atau step tabel digital."}
+  "unresolved_review_items": [],
+  "resolved_m6_decisions": [
+    "Fa/Fv adalah input manual engineer/PUSKIM tanpa interpolasi V1.",
+    "Site Class adalah input engineer; klasifikasi otomatis di luar M6 V1.",
+    "TL adalah input manual tanpa lookup geospasial V1.",
+    "7.2.5.4 memakai batas 75 m (D/E) dan 50 m (F) bila seluruh kondisi terpenuhi.",
+    "Ct/x memakai klasifikasi berbasis aturan Tabel 18.",
+    "Cu memakai interpolasi linier engineer-approved pada interval yang ditetapkan.",
+    "Sa(T) adalah fungsi kontinu; sampling default 0-6 s/0,01 s hanya presentasi.",
+    "W diwarisi dari revisi aktif M5."
+  ],
+  "future_scope_review_items": [
+    {"registry_key":"seismic.site.classification","reason":"Otomasi klasifikasi SA-SF tidak termasuk M6 V1; entry sumber tetap ENGINEER_REVIEW."}
   ]
 }

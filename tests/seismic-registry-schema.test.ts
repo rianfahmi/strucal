@@ -8,7 +8,7 @@ const schema = readJson("../registry/seismic/registry-item.schema.json");
 const registry = readJson("../registry/seismic/sni-1726-2019.engineer-review.json");
 const systems = readJson("../registry/seismic/sni-1726-2019.table-12.systems.json");
 const fixtureSchema = readJson("../registry/seismic/golden-fixture.schema.json");
-const fixtures = readJson("../registry/seismic/golden-fixtures.candidate.json");
+const fixtures = readJson("../registry/seismic/golden-fixtures.json");
 
 const requiredRegistryFields = [
   "registry_key", "standard_id", "standard_version", "clause_or_table_reference", "source_pages",
@@ -21,19 +21,20 @@ const fixture = (kind: string) => fixtures.fixtures.find((item: { verifies: stri
 const output = (item: { expected_outputs: Array<{ name: string; value: unknown }> }, name: string) =>
   item.expected_outputs.find((value) => value.name === name)?.value;
 
-test("schema mendukung provenance halaman dan mewajibkan status review", () => {
+test("schema mendukung provenance, approval, dan kebijakan engineer", () => {
   for (const field of requiredRegistryFields.filter((field) => field !== "source_pages")) assert.ok(schema.required.includes(field), `${field} belum wajib`);
   assert.ok(Object.hasOwn(schema.properties, "source_pages"));
   assert.deepEqual(schema.properties.approval_status.enum, ["DRAFT", "ENGINEER_REVIEW", "APPROVED", "REJECTED"]);
   assert.ok(schema.properties.source_status.enum.includes("STANDARD_EXTRACTED"));
+  assert.deepEqual(schema.properties.policy_status.enum, ["ENGINEER_APPROVED_POLICY"]);
 });
 
-test("manifest menunjuk registry hasil ekstraksi", () => {
-  assert.equal(manifest.status, "ENGINEER_REVIEW_DATA_EXTRACTED");
+test("manifest menunjuk registry approved M6 V1", () => {
+  assert.equal(manifest.status, "APPROVED_M6_V1");
   assert.equal(manifest.populated_registry, "./sni-1726-2019.engineer-review.json");
 });
 
-test("semua entry memenuhi metadata minimum dan belum approved", () => {
+test("entry M6 approved dan klasifikasi tanah otomatis tetap future scope", () => {
   assert.equal(registry.entries.length, 13);
   assert.equal(new Set(registry.entries.map((item: { registry_key: string }) => item.registry_key)).size, 13);
   for (const item of registry.entries) {
@@ -41,22 +42,26 @@ test("semua entry memenuhi metadata minimum dan belum approved", () => {
     assert.equal(item.standard_id, "SNI 1726");
     assert.equal(item.standard_version, "2019");
     assert.equal(item.source_status, "STANDARD_EXTRACTED");
-    assert.equal(item.approval_status, "ENGINEER_REVIEW");
     assert.ok(item.clause_or_table_reference.length > 0);
     assert.ok(item.source_pages.length > 0 && item.source_pages.every(Number.isInteger));
   }
-  assert.equal(registry.unresolved_review_items.length, 8);
+  assert.equal(registry.entries.filter(({ approval_status }: { approval_status: string }) => approval_status === "APPROVED").length, 12);
+  assert.equal(entry("seismic.site.classification").approval_status, "ENGINEER_REVIEW");
+  assert.equal(registry.unresolved_review_items.length, 0);
+  assert.equal(registry.future_scope_review_items.length, 1);
 });
 
-test("Fa/Fv memuat seluruh sumbu, nilai, boundary, dan tidak mengarang interpolasi", () => {
+test("Fa/Fv tetap memuat sumber tetapi M6 memakai input tanpa interpolasi", () => {
   const fa = entry("seismic.site.fa");
   const fv = entry("seismic.site.fv");
   assert.deepEqual(fa.rule_data.axis_Ss_g.map((point: { value: number }) => point.value), [0.25, 0.5, 0.75, 1, 1.25, 1.5]);
   assert.deepEqual(fv.rule_data.axis_S1_g.map((point: { value: number }) => point.value), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]);
   assert.deepEqual(fa.rule_data.rows.SD, [1.6, 1.4, 1.2, 1.1, 1, 1]);
   assert.deepEqual(fv.rule_data.rows.SE, [4.2, 3.3, 2.8, 2.4, 2.2, 2]);
-  assert.match(fa.interpolation_method, /^UNRESOLVED:/);
-  assert.match(fv.interpolation_method, /^UNRESOLVED:/);
+  assert.match(fa.interpolation_method, /^NOT_APPLICABLE_M6_V1:/);
+  assert.match(fv.interpolation_method, /^NOT_APPLICABLE_M6_V1:/);
+  assert.equal(fa.policy_status, "ENGINEER_APPROVED_POLICY");
+  assert.equal(fv.policy_status, "ENGINEER_APPROVED_POLICY");
 });
 
 test("rumus spektrum menghasilkan kandidat boundary yang konsisten", () => {
@@ -93,7 +98,9 @@ test("Tabel 12 lengkap: 85 system_id, parameter, lima kolom KDS, footnote a-p", 
   assert.deepEqual(Object.keys(systems.footnotes), [..."abcdefghijklmnop"]);
   assert.equal(systems.rows.find((row: { system_id: string }) => row.system_id === "C.1").Cd, 5.5);
   assert.equal(systems.rows.find((row: { system_id: string }) => row.system_id === "B.24").limits.F, "TB");
-  assert.ok(systems.review_flags.length > 0);
+  assert.equal(systems.approval_status, "APPROVED");
+  assert.equal(systems.policy_status, "ENGINEER_APPROVED_POLICY");
+  assert.ok(systems.resolved_review_decisions.length > 0);
 });
 
 test("periode, Cs, V, dan Fx kandidat mengikuti formula registry", () => {
@@ -118,14 +125,21 @@ test("periode, Cs, V, dan Fx kandidat mengikuti formula registry", () => {
   assert.ok(Math.abs(forces.reduce((sum, value) => sum + value, 0) - Number(output(fx, "sum_Fx"))) < 1e-9);
 });
 
-test("candidate fixtures mencakup sepuluh sasaran dan semuanya menunggu review", () => {
-  const expected = fixtureSchema.properties.verifies.enum;
-  assert.deepEqual(fixtures.fixtures.map(({ verifies }: { verifies: string }) => verifies).sort(), [...expected].sort());
+test("16 golden fixtures final mencakup seluruh keputusan M6", () => {
+  const allowedKinds = new Set(fixtureSchema.properties.verifies.enum);
+  const requiredIds = [
+    "manual-input-flow", "sds-sd1", "kds", "system-eligibility", "system-blocked", "system-parameters",
+    "concrete-moment-ct-x", "fallback-ct-x", "cu-breakpoint", "cu-interpolated", "ta", "tmax", "cs", "v", "fx", "response-spectrum",
+  ].map((id) => `seismic-fixture-${id}`);
+  assert.equal(fixtures.fixtures.length, 16);
+  assert.deepEqual(fixtures.fixtures.map(({ fixture_id }: { fixture_id: string }) => fixture_id).sort(), requiredIds.sort());
   assert.equal(new Set(fixtures.fixtures.map(({ fixture_id }: { fixture_id: string }) => fixture_id)).size, fixtures.fixtures.length);
   for (const item of fixtures.fixtures) {
+    assert.ok(allowedKinds.has(item.verifies));
     assert.equal(item.registry_version, registry.registry_version);
-    assert.equal(item.source_status, "STANDARD_DERIVED");
-    assert.equal(item.approval_status, "ENGINEER_REVIEW");
+    assert.ok(["STANDARD_DERIVED", "ENGINEER_PROVIDED"].includes(item.source_status));
+    assert.equal(item.approval_status, "APPROVED");
+    assert.equal(item.reviewed_by, "ENGINEER_APPROVED_M6_V1");
     assert.ok(item.clause_or_table_references.length > 0);
   }
 });

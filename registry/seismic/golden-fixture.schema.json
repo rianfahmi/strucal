@@ -18,7 +18,7 @@
     "standard_version": { "type": "string", "minLength": 1 },
     "clause_or_table_references": { "type": "array", "items": { "type": "string" } },
     "verifies": {
-      "enum": ["FA_FV_INTERPOLATION", "SDS_SD1", "KDS", "SYSTEM_ELIGIBILITY", "SYSTEM_PARAMETER_LOOKUP", "TA", "CS", "V", "FX", "RESPONSE_SPECTRUM_ORDINATES"]
+      "enum": ["MANUAL_INPUT_FLOW", "SDS_SD1", "KDS", "SYSTEM_ELIGIBILITY", "SYSTEM_PARAMETER_LOOKUP", "CU", "TA", "TMAX", "CS", "V", "FX", "RESPONSE_SPECTRUM_ORDINATES"]
     },
     "required_cases": { "type": "array", "minItems": 1, "items": { "type": "string" } },
     "inputs": { "type": "array", "items": { "$ref": "#/$defs/value" } },

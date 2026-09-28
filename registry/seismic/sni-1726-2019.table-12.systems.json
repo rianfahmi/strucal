@@ -3,7 +3,10 @@
   "standard_version": "2019",
   "table_reference": "Tabel 12 dan 7.2.1-7.2.5.8",
   "source_pages": [47, 48, 49, 50, 51, 52, 53, 54, 55, 56],
-  "approval_status": "ENGINEER_REVIEW",
+  "approval_status": "APPROVED",
+  "policy_status": "ENGINEER_APPROVED_POLICY",
+  "reviewed_by": "ENGINEER_APPROVED_M6_V1",
+  "reviewed_at": "2026-09-28T00:00:00Z",
   "legend": {
     "TB": "Tidak dibatasi",
     "TI": "Tidak diizinkan",
@@ -143,7 +146,7 @@
     {"reference":"7.2.5.7","source_pages":[55,56],"rule":"Rangka baja momen menengah pada KDS D/E/F hanya diizinkan lewat kondisi khusus pasal: satu lantai sampai 20 m dengan beban mati atap tributari <= 0,96 kN/m2 dan batas dinding eksterior terkait; pengecualian bangunan pelindung peralatan berlaku untuk D/E; alternatif rangka ringan sampai 10 m, dengan batas beban tambahan pada E/F sesuai pasal."},
     {"reference":"7.2.5.8","source_pages":[56],"rule":"Sistem interaktif: dinding geser memikul sedikitnya 75 % geser tingkat desain dan rangka sedikitnya 25 % pada tiap tingkat."}
   ],
-  "review_flags": [
-    "Tabel 12 memakai 48/30 m, catatan e/f menyebut 72/48 m, sedangkan 7.2.5.4 menyebut peningkatan 50->75 m dan 30->50 m; engineer harus menetapkan implementasi konsisten tanpa pembulatan diam-diam."
+  "resolved_review_decisions": [
+    "Untuk sistem yang dicakup 7.2.5.4, gunakan 75 m pada KDS D/E dan 50 m pada KDS F hanya bila seluruh kondisi pasal dipenuhi; nilai Tabel 12 lain tidak diubah."
   ]
 }

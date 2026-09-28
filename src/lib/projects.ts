@@ -236,7 +236,12 @@ function reviseLoadIds(loads: Loads, revisionId: string): Loads {
 }
 
 function reviseSeismicId(seismic: SeismicModel, revisionId: string, invalidate: boolean): SeismicModel {
-  return { ...seismic, revision_id: revisionId, derived_results: invalidate ? null : seismic.derived_results };
+  return {
+    ...seismic,
+    revision_id: revisionId,
+    input_provenance: Object.fromEntries(Object.entries(seismic.input_provenance).map(([key, value]) => [key, { ...value, project_revision: revisionId }])) as SeismicModel["input_provenance"],
+    derived_results: invalidate ? null : seismic.derived_results,
+  };
 }
 
 export function sameProjectInput(project: Project, input: ProjectInput) {

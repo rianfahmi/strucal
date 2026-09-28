@@ -4,7 +4,7 @@
   "project_registry_version": "SNI-1726:2019|SNI-1727:2020|SNI-2847:2019",
   "seismic_standard_id": "SNI 1726",
   "seismic_standard_version": "2019",
-  "status": "ENGINEER_REVIEW_DATA_EXTRACTED",
+  "status": "APPROVED_M6_V1",
   "item_schema": "./registry-item.schema.json",
   "populated_registry": "./sni-1726-2019.engineer-review.json",
   "items": [

@@ -39,6 +39,7 @@
     "rule_data": { "type": "object" },
     "data_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
     "source_status": { "enum": ["UNRESOLVED", "STANDARD_EXTRACTED", "PROJECT_APPROVED", "ENGINEER_PROVIDED"] },
+    "policy_status": { "enum": ["ENGINEER_APPROVED_POLICY"] },
     "approval_status": { "enum": ["DRAFT", "ENGINEER_REVIEW", "APPROVED", "REJECTED"] },
     "reviewed_by": { "type": ["string", "null"] },
     "reviewed_at": { "type": ["string", "null"], "format": "date-time" },
