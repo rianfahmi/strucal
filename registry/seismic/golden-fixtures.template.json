@@ -1,0 +1,78 @@
+{
+  "template_id": "strucal-m6-seismic-golden-fixtures",
+  "schema": "./golden-fixture.schema.json",
+  "instructions": "Engineer mengisi kasus, nilai, unit, toleransi, sumber, dan review metadata. Engine hanya menerima fixture APPROVED dengan registry_version yang sama.",
+  "fixtures": [
+    {
+      "fixture_id": "seismic-fixture-fa-fv-interpolation",
+      "title": "Fa dan Fv lookup, interpolasi, dan boundary",
+      "registry_version": null, "standard_id": "SNI 1726", "standard_version": "2019", "clause_or_table_references": [],
+      "verifies": "FA_FV_INTERPOLATION",
+      "required_cases": ["Fa exact grid point", "Fa interior interpolation", "Fa lower boundary", "Fa upper boundary", "Fv exact grid point", "Fv interior interpolation", "Fv lower boundary", "Fv upper boundary", "Setiap kelas situs khusus"],
+      "inputs": [], "expected_outputs": [], "tolerances": [], "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "fixture_id": "seismic-fixture-sds-sd1",
+      "title": "SMS, SM1, SDS, dan SD1",
+      "registry_version": null, "standard_id": "SNI 1726", "standard_version": "2019", "clause_or_table_references": [],
+      "verifies": "SDS_SD1", "required_cases": ["Kasus normal dengan Ss/S1 dan Fa/Fv approved", "Nilai pada boundary yang memengaruhi derivasi"],
+      "inputs": [], "expected_outputs": [], "tolerances": [], "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "fixture_id": "seismic-fixture-kds",
+      "title": "KDS dari semua aturan dan governing",
+      "registry_version": null, "standard_id": "SNI 1726", "standard_version": "2019", "clause_or_table_references": [],
+      "verifies": "KDS", "required_cases": ["Setiap kategori risiko", "Setiap sisi threshold SDS", "Setiap sisi threshold SD1", "Kasus hasil tabel berbeda untuk menguji governing"],
+      "inputs": [], "expected_outputs": [], "tolerances": [], "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "fixture_id": "seismic-fixture-system-eligibility",
+      "title": "Eligibility sistem struktur",
+      "registry_version": null, "standard_id": "SNI 1726", "standard_version": "2019", "clause_or_table_references": [],
+      "verifies": "SYSTEM_ELIGIBILITY", "required_cases": ["ALLOWED", "CONDITIONAL", "BLOCKED", "Tepat pada batas tinggi", "Di atas batas tinggi", "Pembatasan kategori risiko", "Kondisi khusus"],
+      "inputs": [], "expected_outputs": [], "tolerances": [], "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "fixture_id": "seismic-fixture-system-parameters",
+      "title": "Lookup parameter sistem",
+      "registry_version": null, "standard_id": "SNI 1726", "standard_version": "2019", "clause_or_table_references": [],
+      "verifies": "SYSTEM_PARAMETER_LOOKUP", "required_cases": ["R, Ω0, Cd, Ct, x untuk setiap system_id", "Semua parameter tambahan", "System_id tidak dikenal ditolak"],
+      "inputs": [], "expected_outputs": [], "tolerances": [], "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "fixture_id": "seismic-fixture-ta",
+      "title": "Periode Ta dan batas periode",
+      "registry_version": null, "standard_id": "SNI 1726", "standard_version": "2019", "clause_or_table_references": [],
+      "verifies": "TA", "required_cases": ["Ta untuk setiap pasangan Ct/x", "Batas periode bila berlaku", "Tepat pada threshold lookup", "Tinggi bangunan relatif level dasar"],
+      "inputs": [], "expected_outputs": [], "tolerances": [], "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "fixture_id": "seismic-fixture-cs",
+      "title": "Cs dan seluruh kontrol",
+      "registry_version": null, "standard_id": "SNI 1726", "standard_version": "2019", "clause_or_table_references": [],
+      "verifies": "CS", "required_cases": ["Formula utama governing", "Setiap batas atas governing", "Setiap batas bawah governing", "Setiap kondisi transisi", "Tepat pada threshold"],
+      "inputs": [], "expected_outputs": [], "tolerances": [], "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "fixture_id": "seismic-fixture-v",
+      "title": "Base shear V dengan W dari M5",
+      "registry_version": null, "standard_id": "SNI 1726", "standard_version": "2019", "clause_or_table_references": [],
+      "verifies": "V", "required_cases": ["Cs valid dan W M5 tersedia", "W M5 invalid", "W M5 stale/revisi berbeda"],
+      "inputs": [], "expected_outputs": [], "tolerances": [], "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "fixture_id": "seismic-fixture-fx",
+      "title": "Distribusi gaya story Fx",
+      "registry_version": null, "standard_id": "SNI 1726", "standard_version": "2019", "clause_or_table_references": [],
+      "verifies": "FX", "required_cases": ["Setiap aturan k", "Interpolasi k bila berlaku", "Distribusi multi-story", "Story dengan berat nol", "Jumlah Fx sama dengan V dalam toleransi"],
+      "inputs": [], "expected_outputs": [], "tolerances": [], "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    },
+    {
+      "fixture_id": "seismic-fixture-response-spectrum",
+      "title": "Ordinata response spectrum",
+      "registry_version": null, "standard_id": "SNI 1726", "standard_version": "2019", "clause_or_table_references": [],
+      "verifies": "RESPONSE_SPECTRUM_ORDINATES", "required_cases": ["T = 0", "T = T0", "T = Ts", "T = TL bila berlaku", "Satu titik interior setiap segmen", "Periode maksimum sampling", "Kontinuitas pada transisi"],
+      "inputs": [], "expected_outputs": [], "tolerances": [], "source_status": "UNRESOLVED", "approval_status": "DRAFT", "reviewed_by": null, "reviewed_at": null, "source_note": null
+    }
+  ]
+}

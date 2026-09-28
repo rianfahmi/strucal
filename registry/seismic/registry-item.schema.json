@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://strucal.local/schemas/seismic-registry-item.schema.json",
+  "title": "StruCal M6 Seismic Registry Item",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "registry_key", "standard_id", "standard_version", "clause_or_table_reference",
+    "applicability", "inputs", "outputs", "units", "interpolation_method",
+    "boundary_behavior", "formula_id", "formula_expression", "source_status", "approval_status"
+  ],
+  "properties": {
+    "registry_key": { "type": "string", "pattern": "^seismic\\.[a-z0-9_.-]+$" },
+    "category": { "type": "string" },
+    "standard_id": { "type": "string", "minLength": 1 },
+    "standard_version": { "type": "string", "minLength": 1 },
+    "clause_or_table_reference": { "type": ["string", "null"] },
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "conditions"],
+      "properties": {
+        "description": { "type": "string" },
+        "conditions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "inputs": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+    "outputs": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+    "units": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "null"] }
+    },
+    "interpolation_method": { "type": ["string", "null"] },
+    "boundary_behavior": { "type": ["string", "null"] },
+    "formula_id": { "type": ["string", "null"] },
+    "formula_expression": { "type": ["string", "null"] },
+    "required_details": { "type": "array", "items": { "type": "string" } },
+    "source_status": { "enum": ["UNRESOLVED", "PROJECT_APPROVED", "ENGINEER_PROVIDED"] },
+    "approval_status": { "enum": ["DRAFT", "ENGINEER_REVIEW", "APPROVED", "REJECTED"] },
+    "reviewed_by": { "type": ["string", "null"] },
+    "reviewed_at": { "type": ["string", "null"], "format": "date-time" },
+    "source_note": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "unit", "value_status"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "unit": { "type": ["string", "null"] },
+        "value_status": { "enum": ["DEFINED", "UNRESOLVED"] }
+      }
+    }
+  }
+}

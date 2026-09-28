@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://strucal.local/schemas/seismic-golden-fixture.schema.json",
+  "title": "StruCal M6 Engineer-Approved Golden Fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fixture_id", "title", "registry_version", "standard_id", "standard_version",
+    "clause_or_table_references", "verifies", "required_cases", "inputs",
+    "expected_outputs", "tolerances", "source_status", "approval_status",
+    "reviewed_by", "reviewed_at", "source_note"
+  ],
+  "properties": {
+    "fixture_id": { "type": "string", "pattern": "^seismic-fixture-[a-z0-9-]+$" },
+    "title": { "type": "string", "minLength": 1 },
+    "registry_version": { "type": ["string", "null"] },
+    "standard_id": { "type": "string", "minLength": 1 },
+    "standard_version": { "type": "string", "minLength": 1 },
+    "clause_or_table_references": { "type": "array", "items": { "type": "string" } },
+    "verifies": {
+      "enum": ["FA_FV_INTERPOLATION", "SDS_SD1", "KDS", "SYSTEM_ELIGIBILITY", "SYSTEM_PARAMETER_LOOKUP", "TA", "CS", "V", "FX", "RESPONSE_SPECTRUM_ORDINATES"]
+    },
+    "required_cases": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "inputs": { "type": "array", "items": { "$ref": "#/$defs/value" } },
+    "expected_outputs": { "type": "array", "items": { "$ref": "#/$defs/value" } },
+    "tolerances": { "type": "array", "items": { "$ref": "#/$defs/tolerance" } },
+    "source_status": { "enum": ["UNRESOLVED", "ENGINEER_PROVIDED"] },
+    "approval_status": { "enum": ["DRAFT", "ENGINEER_REVIEW", "APPROVED", "REJECTED"] },
+    "reviewed_by": { "type": ["string", "null"] },
+    "reviewed_at": { "type": ["string", "null"], "format": "date-time" },
+    "source_note": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value", "unit"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "value": { "type": ["number", "string", "null"] },
+        "unit": { "type": ["string", "null"] }
+      }
+    },
+    "tolerance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["output_name", "absolute", "relative", "unit"],
+      "properties": {
+        "output_name": { "type": "string", "minLength": 1 },
+        "absolute": { "type": ["number", "null"], "minimum": 0 },
+        "relative": { "type": ["number", "null"], "minimum": 0 },
+        "unit": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
