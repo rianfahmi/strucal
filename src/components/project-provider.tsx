@@ -2,9 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getProjectBundle, listProjects, persistProjectBundle } from "../lib/project-database";
-import { createProjectBundle, reviseGeometry, reviseMaterials, reviseProject, sameProjectInput, type Project, type ProjectBundle, type ProjectInput } from "../lib/projects";
+import { createProjectBundle, reviseGeometry, reviseLoads, reviseMaterials, reviseProject, sameProjectInput, type Project, type ProjectBundle, type ProjectInput } from "../lib/projects";
 import { sameGeometry, type Geometry } from "../lib/geometry";
 import { sameMaterials, type Materials } from "../lib/materials";
+import { sameLoads, type Loads } from "../lib/loads";
 
 export type SaveStatus = "loading" | "saved" | "saving" | "unsaved" | "error";
 type ProjectContextValue = {
@@ -16,6 +17,7 @@ type ProjectContextValue = {
   saveProject: (input: ProjectInput, reason: "manual" | "autosave") => Promise<void>;
   saveGeometry: (geometry: Geometry, reason: "manual" | "autosave") => Promise<void>;
   saveMaterials: (materials: Materials, reason: "manual" | "autosave") => Promise<void>;
+  saveLoads: (loads: Loads, reason: "manual" | "autosave") => Promise<void>;
   markUnsaved: () => void;
 };
 
@@ -143,7 +145,29 @@ export function ProjectProvider({ children }: Readonly<{ children: React.ReactNo
     await queue.current;
   }, [applyActive]);
 
-  return <ProjectContext.Provider value={{ projects, active, saveStatus, createProject, selectProject, saveProject, saveGeometry, saveMaterials, markUnsaved: () => setSaveStatus("unsaved") }}>{children}</ProjectContext.Provider>;
+  const saveLoads = useCallback(async (loads: Loads, reason: "manual" | "autosave") => {
+    queue.current = queue.current.then(async () => {
+      const current = activeRef.current;
+      if (!current || sameLoads(current.loads, loads)) {
+        setSaveStatus("saved");
+        return;
+      }
+      setSaveStatus("saving");
+      try {
+        const next = reviseLoads(current, loads, reason);
+        await persistProjectBundle(next);
+        applyActive(next);
+        setProjects((items) => [next.project, ...items.filter(({ id }) => id !== next.project.id)]);
+        setSaveStatus("saved");
+      } catch (error) {
+        console.error("Gagal menyimpan pembebanan", error);
+        setSaveStatus("error");
+      }
+    });
+    await queue.current;
+  }, [applyActive]);
+
+  return <ProjectContext.Provider value={{ projects, active, saveStatus, createProject, selectProject, saveProject, saveGeometry, saveMaterials, saveLoads, markUnsaved: () => setSaveStatus("unsaved") }}>{children}</ProjectContext.Provider>;
 }
 
 export function useProjects() {

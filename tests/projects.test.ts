@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createProjectBundle, reviseGeometry, reviseProject } from "../src/lib/projects.ts";
+import { createProjectBundle, reviseGeometry, reviseLoads, reviseProject } from "../src/lib/projects.ts";
 
 const ids = (...values: string[]) => {
   let index = 0;
@@ -40,6 +40,7 @@ test("save creates traceable revision metadata and preserves the project id", ()
   assert.equal(saved.revision.source_revision_id, "revision-1");
   assert.equal(saved.revision.save_reason, "autosave");
   assert.equal(saved.geometry.revision_id, "revision-2");
+  assert.equal(saved.loads.revision_id, "revision-2");
 });
 
 test("geometry save creates a revision and rejects invalid geometry", () => {
@@ -55,4 +56,29 @@ test("geometry save creates a revision and rejects invalid geometry", () => {
   assert.equal(saved.geometry.revision_id, "revision-2");
   assert.equal(saved.revision.source_revision_id, "revision-1");
   assert.throws(() => reviseGeometry(initial, { ...geometry, grid_x: [{ ...geometry.grid_x[0] }] }, "manual"), /minimal memiliki dua garis/);
+});
+
+test("load save creates a revision and updates all nested load revision references", () => {
+  const initial = createProjectBundle(
+    { title: "Gedung A", location: "", function: "", owner: "" },
+    ids("project-1", "revision-1"),
+    () => "2026-09-28T00:00:00.000Z",
+  );
+  const loads = {
+    ...initial.loads,
+    definitions: initial.loads.definitions.map((definition, index) => ({
+      ...definition,
+      value: index + 1,
+      source: "Kriteria desain",
+      assumption: "Beban merata",
+      seismic_weight_factor: index < 4 ? 1 : 0,
+    })),
+  };
+  const saved = reviseLoads(initial, loads, "manual", ids("revision-2"), () => "2026-09-28T00:01:00.000Z");
+
+  assert.equal(saved.loads.revision_id, "revision-2");
+  assert.ok(saved.loads.definitions.every(({ revision_id }) => revision_id === "revision-2"));
+  assert.equal(saved.geometry.revision_id, "revision-2");
+  assert.equal(saved.materials.revision_id, "revision-2");
+  assert.throws(() => reviseLoads(initial, initial.loads, "manual"), /Nilai load/);
 });
