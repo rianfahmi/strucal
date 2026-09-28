@@ -1,5 +1,4 @@
 import type { Geometry } from "./geometry.ts";
-import type { CombinationRegistry } from "./load-registry.ts";
 
 export type LoadCategory = "SELF_WEIGHT" | "SUPERIMPOSED_DEAD" | "LIVE" | "ROOF_LIVE" | "WIND" | "RAIN" | "SEISMIC";
 export type LoadApplication = "UNIFORM_AREA" | "UNIFORM_LINE";
@@ -129,13 +128,8 @@ export function changeLoadApplication(definition: LoadDefinition, application: L
   return { ...definition, application, unit: unitFor(application) };
 }
 
-export function validateLoads(loads: Loads, geometry: Geometry, registry: CombinationRegistry): LoadIssue[] {
+export function validateLoads(loads: Loads, geometry: Geometry): LoadIssue[] {
   const issues: LoadIssue[] = [];
-  if (loads.combination_registry_version !== registry.registry_version) issues.push({ path: "combination_registry_version", message: "Versi registry kombinasi tidak sama dengan revisi proyek." });
-  const registryIds = new Set(registry.rules.map(({ id }) => id));
-  loads.combination_rule_ids.forEach((id, index) => {
-    if (!registryIds.has(id)) issues.push({ path: `combination_rule_ids.${index}`, message: `Aturan kombinasi ${id} tidak tersedia pada registry aktif.` });
-  });
   for (const category of REQUIRED_CATEGORIES) {
     if (!loads.definitions.some((definition) => definition.category === category)) issues.push({ path: "definitions", message: `${LOAD_CATEGORY_LABELS[category]} wajib tersedia.` });
   }

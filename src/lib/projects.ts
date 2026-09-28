@@ -1,7 +1,6 @@
 import { createDefaultGeometry, validateGeometry, type Geometry } from "./geometry.ts";
 import { createDefaultMaterials, validateMaterials, type Materials } from "./materials.ts";
 import { calculateSeismicWeight, createDefaultLoads, validateLoads, type Loads } from "./loads.ts";
-import { getCombinationRegistry } from "./load-registry.ts";
 import { calculateSeismic, createDefaultSeismic, seismicContext, type SeismicModel } from "./seismic.ts";
 import { getSeismicRegistry } from "./seismic-registry.ts";
 
@@ -173,7 +172,7 @@ export function reviseLoads(
   id: () => string = () => crypto.randomUUID(),
   now: () => string = () => new Date().toISOString(),
 ): ProjectBundle {
-  const issues = validateLoads(loads, current.geometry, getCombinationRegistry(current.revision.registry_version));
+  const issues = validateLoads(loads, current.geometry);
   if (issues.length) throw new Error(issues[0].message);
   const createdAt = now();
   const revisionId = id();

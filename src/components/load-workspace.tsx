@@ -43,9 +43,9 @@ function LoadEditor({ initial, geometry, registryVersion, markUnsaved, saveLoads
   const [assignmentTargetId, setAssignmentTargetId] = useState("");
   const [assignmentAssumption, setAssignmentAssumption] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const registry = getCombinationRegistry(registryVersion);
+  const registry = getCombinationRegistry(loads.combination_registry_version);
   const targets = loadTargets(geometry);
-  const issues = validateLoads(loads, geometry, registry);
+  const issues = validateLoads(loads, geometry);
   const seismicWeight = calculateSeismicWeight(loads, geometry, registryVersion);
 
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -54,7 +54,7 @@ function LoadEditor({ initial, geometry, registryVersion, markUnsaved, saveLoads
     setLoads(next);
     markUnsaved();
     clearTimeout(timer.current);
-    if (!validateLoads(next, geometry, registry).length) timer.current = setTimeout(() => void saveLoads(next, "autosave"), 800);
+    if (!validateLoads(next, geometry).length) timer.current = setTimeout(() => void saveLoads(next, "autosave"), 800);
   }
 
   function updateDefinition(id: string, update: (definition: LoadDefinition) => LoadDefinition) {
@@ -134,12 +134,13 @@ function LoadEditor({ initial, geometry, registryVersion, markUnsaved, saveLoads
 
     {tab === "combinations" && <section aria-labelledby="combination-title">
       <LoadHeading id="combination-title" eyebrow={`Registry ${registry.registry_version}`} title="Combination Review" badge="CODE" />
-      {registry.status === "PENDING_ENGINEER_APPROVAL" ? <div className="registry-review" role="status"><strong>PERLU REVIEW</strong><p>{registry.note}</p><small>Kombinasi tidak di-hardcode di UI dan tidak akan diterbitkan sebelum registry disetujui.</small></div> : <div className="table-scroll"><table className="load-table"><thead><tr><th>ID</th><th>Kombinasi</th><th>Referensi</th></tr></thead><tbody>{registry.rules.map((rule) => <tr key={rule.id}><td>{rule.id}</td><td>{rule.expression}</td><td>{rule.standard_ref}</td></tr>)}</tbody></table></div>}
+      <div className="registry-review" role="status"><strong>REFERENSI PROYEK</strong><p>{registry.note}</p><small>Kombinasi didokumentasikan untuk setup ETABS dan laporan; tidak digunakan menghitung respons struktur atau menentukan readiness.</small></div>
+      {registry.rules.length > 0 && <div className="table-scroll"><table className="load-table"><thead><tr><th>ID</th><th>Kombinasi</th><th>Status</th><th>Referensi</th></tr></thead><tbody>{registry.rules.map((rule) => <tr key={rule.id}><td>{rule.id}</td><td>{rule.expression}</td><td>{registry.status}</td><td>{rule.standard_ref}</td></tr>)}</tbody></table></div>}
     </section>}
 
     {tab === "summary" && <section aria-labelledby="load-summary-title">
       <LoadHeading id="load-summary-title" eyebrow="Review revisi aktif" title="Load Summary" badge="INHERITED" />
-      <div className="load-kpis"><article><span>Definitions</span><strong>{loads.definitions.length}</strong><small>6 kategori minimum</small></article><article><span>Assignments</span><strong>{loads.assignments.length}</strong><small>Target geometri aktual</small></article><article><span>Registry combinations</span><strong>{loads.combination_rule_ids.length}</strong><small>{registry.status === "APPROVED" ? "Approved" : "Menunggu persetujuan"}</small></article></div>
+      <div className="load-kpis"><article><span>Definitions</span><strong>{loads.definitions.length}</strong><small>6 kategori minimum</small></article><article><span>Assignments</span><strong>{loads.assignments.length}</strong><small>Target geometri aktual</small></article><article><span>Combination references</span><strong>{loads.combination_rule_ids.length}</strong><small>Metadata handoff ETABS</small></article></div>
       <div className={`load-validation ${issues.length ? "has-error" : "is-valid"}`} role="status"><strong>{issues.length ? `${issues.length} data pembebanan perlu diperbaiki` : "Data pembebanan valid"}</strong><span>{issues[0]?.message ?? "Unit, provenance, target, dan revisi konsisten."}</span></div>
     </section>}
 

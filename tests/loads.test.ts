@@ -66,19 +66,19 @@ test("berat seismik diturunkan dari load definition, assignment, faktor, dan uku
   assert.equal(result.formula_id, "LOAD.SW.AGGREGATE.1");
 });
 
-test("validasi menolak input load kosong, target asing, duplikasi assignment, dan aturan registry asing", () => {
+test("validasi menolak input load kosong, target asing, dan duplikasi assignment tanpa memblokir referensi kombinasi", () => {
   const geometry = createDefaultGeometry("revision-1");
   const loads = validLoads();
   loads.definitions[0].source = "";
   loads.assignments.push({ ...loads.assignments[0], id: "assignment-2", target_id: "missing" });
   loads.combination_rule_ids = ["not-approved"];
-  const paths = validateLoads(loads, geometry, getCombinationRegistry(registryVersion)).map(({ path }) => path);
+  const paths = validateLoads(loads, geometry).map(({ path }) => path);
   assert.ok(paths.includes("definitions.0.source"));
   assert.ok(paths.includes("assignments.1.target_id"));
-  assert.ok(paths.includes("combination_rule_ids.0"));
+  assert.ok(!paths.some((path) => path.startsWith("combination_")));
 });
 
-test("registry kombinasi tidak mengarang aturan sebelum persetujuan engineer", () => {
+test("registry kombinasi kosong tidak mengarang referensi proyek", () => {
   const registry = getCombinationRegistry(registryVersion);
   assert.equal(registry.status, "PENDING_ENGINEER_APPROVAL");
   assert.deepEqual(registry.rules, []);

@@ -330,6 +330,7 @@ h1, h2, p { margin: 0; }
 .etabs-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: .8rem; align-items: start; }
 .etabs-content { display: grid; min-width: 0; gap: .8rem; }
 .etabs-hero { display: flex; justify-content: space-between; gap: 1rem; border-left: 4px solid #b85858; }
+.etabs-hero.is-ready { border-left-color: #3e8a71; }
 .etabs-hero h2 { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; }
 .etabs-hero p:not(.eyebrow), .etabs-hero > small { margin-top: .5rem; color: #63736d; font-size: .72rem; line-height: 1.5; }
 .etabs-stale, .etabs-review { color: #875d0c !important; }
@@ -357,6 +358,7 @@ h1, h2, p { margin: 0; }
 .etabs-checklist li { padding: .6rem 0; border-top: 1px solid #edf0ef; }
 .etabs-checklist li > div { display: flex; align-items: flex-start; justify-content: space-between; gap: .4rem; }
 .etabs-checklist li > div > strong { color: #293a34; font-size: .7rem; }
+.etabs-checklist li > small { display: block; margin-top: .2rem; color: #7a8782; font-size: .55rem; font-weight: 800; }
 .etabs-checklist li p { margin: .25rem 0; color: #63736d; font-size: .65rem; line-height: 1.4; }
 
 @media (max-width: 1050px) {

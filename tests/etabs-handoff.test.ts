@@ -51,8 +51,9 @@ test("M7 mengagregasi M3–M6, provenance, load case, dan tabel spektrum dari re
   assert.equal(handoff.loadCases.at(-1)?.source, "M6");
   assert.ok(handoff.spectrum.length > 100);
   assert.equal(handoff.spectrum[0].acceleration.unit, "g");
-  assert.equal(handoff.status, "BLOCKED");
-  assert.equal(handoff.readiness.find(({ label }) => label === "Kombinasi beban")?.status, "BLOCKED");
+  assert.equal(handoff.status, "READY");
+  assert.equal(handoff.readiness.find(({ label }) => label === "Kombinasi beban")?.status, "WARNING");
+  assert.equal(handoff.readiness.find(({ label }) => label === "Kombinasi beban")?.classification, "REFERENCE_ONLY");
 });
 
 test("data hilang, assignment invalid, dan revisi upstream tidak pernah READY", () => {
@@ -74,16 +75,30 @@ test("data hilang, assignment invalid, dan revisi upstream tidak pernah READY", 
   assert.equal(stale.grids[0].lines[1].ordinate, 7);
 });
 
-test("kombinasi hanya ditampilkan dari registry approved dan terpilih", () => {
+test("kombinasi referensi terpilih ditampilkan tanpa memblokir readiness atau mensyaratkan approval", () => {
   const bundle = completeBundle();
   const pending = getCombinationRegistry(bundle.revision.registry_version);
   bundle.loads.combination_rule_ids = ["COMBO-1"];
-  assert.deepEqual(createEtabsHandoff(bundle, pending).combinations, []);
+  const reviewRegistry: CombinationRegistry = { ...pending, rules: [{ id: "COMBO-1", label: "Uji", expression: "1.2D + 1.6L", standard_ref: "Referensi proyek", reviewed_by: "", reviewed_at: "" }] };
+  const reviewHandoff = createEtabsHandoff(bundle, reviewRegistry);
+  assert.deepEqual(reviewHandoff.combinations.map(({ expression }) => expression), ["1.2D + 1.6L"]);
+  assert.equal(reviewHandoff.status, "READY");
   const approved: CombinationRegistry = { ...pending, status: "APPROVED", rules: [{ id: "COMBO-1", label: "Uji", expression: "1.2D + 1.6L", standard_ref: "Engineer approved fixture", reviewed_by: "Engineer", reviewed_at: "2026-09-28" }] };
   const handoff = createEtabsHandoff(bundle, approved);
   assert.deepEqual(handoff.combinations.map(({ expression }) => expression), ["1.2D + 1.6L"]);
   assert.equal(handoff.readiness.find(({ label }) => label === "Kombinasi beban")?.status, "READY");
-  assert.equal(handoff.status, "WARNING");
+  assert.equal(handoff.status, "READY");
+});
+
+test("asumsi pemodelan tersisa diklasifikasikan sebagai warning atau tanggung jawab ETABS", () => {
+  const handoff = createEtabsHandoff(completeBundle());
+  assert.equal(handoff.readiness.find(({ label }) => label === "Section / elemen")?.classification, "WARNING_ONLY");
+  for (const label of ["Boundary / restraint", "Self-weight multiplier", "Setup load case", "Setup response spectrum"]) {
+    const item = handoff.readiness.find((entry) => entry.label === label);
+    assert.equal(item?.status, "WARNING");
+    assert.equal(item?.classification, "ETABS_RESPONSIBILITY");
+  }
+  assert.equal(handoff.status, "READY");
 });
 
 test("bundle hasil reopen tetap menghasilkan handoff yang sama", () => {

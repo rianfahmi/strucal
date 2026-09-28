@@ -19,6 +19,6 @@ export function getCombinationRegistry(registryVersion: string): CombinationRegi
     registry_version: registryVersion,
     status: "PENDING_ENGINEER_APPROVAL",
     rules: [],
-    note: "Belum ada ekstraksi aturan kombinasi yang disetujui engineer pada registry proyek.",
+    note: "Belum ada kombinasi referensi dari dokumen proyek yang dimuat.",
   };
 }
