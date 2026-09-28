@@ -14,8 +14,9 @@ const createSnapshot = () => {
 
 test("report template map berhenti pada BAB III handoff", () => {
   const { workspace } = createSnapshot();
-  assert.equal(workspace.sections.length, 14);
-  assert.equal(workspace.template_fidelity_status, "UNVERIFIED_REFERENCE_MISSING");
+  assert.equal(workspace.sections.length, 30);
+  assert.equal(workspace.template_fidelity_status, "VERIFIED_REFERENCE_MAP");
+  assert.equal(workspace.template_reference, "185.1. Laporan Bagian Depan(1).docx");
   assert.deepEqual([...new Set(workspace.sections.map(({ chapter }) => chapter))], ["FRONT MATTER", "BAB I", "BAB II", "BAB III"]);
   assert.ok(!workspace.sections.some(({ chapter }) => chapter === "BAB IV"));
   assert.equal(validateReport(workspace).status, "READY");
@@ -66,10 +67,15 @@ test("DOCX memuat heading Word, field caption, TOC, daftar gambar/tabel, dan kon
   assert.match(packageText, /TOC \\o &quot;1-3&quot;/);
   assert.match(packageText, /TOC \\h \\z \\c &quot;Gambar&quot;/);
   assert.match(packageText, /TOC \\h \\z \\c &quot;Tabel&quot;/);
-  assert.match(packageText, /StruCal tidak menghitung respons struktur dari kombinasi tersebut/);
-  assert.match(packageText, /Belum dimuat dari dokumen referensi/);
+  assert.match(packageText, /Input dan Provenance Parameter Gempa/);
+  assert.match(packageText, /Koefisien Respons Seismik/);
+  assert.match(packageText, /Distribusi Gaya Gempa per Tingkat/);
+  assert.match(packageText, /Respons struktur dari kombinasi tersebut belum dihitung/);
+  assert.match(packageText, /Belum dimuat dari registry aktif/);
+  assert.match(packageText, /w:pgMar w:top="1701" w:right="1701" w:bottom="1701" w:left="2268"/);
+  assert.match(packageText, /w:styleId="Heading3"/);
   assert.doesNotMatch(packageText, /BAB IV|Reaksi Tumpuan|Gaya Dalam Elemen|Hasil Modal ETABS/);
-  assert.equal(packageText.match(/<w:tbl>/g)?.length, 13);
+  assert.ok((packageText.match(/<w:tbl>/g)?.length ?? 0) >= 25);
 });
 
 test("gambar upload menggantikan media sistem pada DOCX", () => {

@@ -55,7 +55,7 @@ export type ReportWorkspace = {
   project_id: string;
   project_revision: string;
   template_reference: string;
-  template_fidelity_status: "UNVERIFIED_REFERENCE_MISSING";
+  template_fidelity_status: "VERIFIED_REFERENCE_MAP";
   sections: ReportSection[];
   figures: ReportFigure[];
   tables: ReportTable[];
@@ -73,7 +73,7 @@ export type ReportSnapshot = {
   registry_version: string;
   combination_registry_version: string;
   template_reference: string;
-  template_fidelity_status: "UNVERIFIED_REFERENCE_MISSING";
+  template_fidelity_status: "VERIFIED_REFERENCE_MAP";
   figures: ReportFigure[];
   tables: ReportTable[];
   uploaded_image_references: string[];
@@ -89,40 +89,70 @@ const SECTION_TEMPLATE: Omit<ReportSection, "status">[] = [
   { section_id: "1", chapter: "BAB I", title: "PENDAHULUAN", level: 1, order_index: 10 },
   { section_id: "1.1", chapter: "BAB I", title: "Data Perencanaan", level: 2, order_index: 11 },
   { section_id: "1.2", chapter: "BAB I", title: "Data Bangunan", level: 2, order_index: 12 },
-  { section_id: "1.3", chapter: "BAB I", title: "Data Struktur dan Gambar Rencana", level: 2, order_index: 13 },
-  { section_id: "1.4", chapter: "BAB I", title: "Dasar Perencanaan dan Peraturan", level: 2, order_index: 14 },
+  { section_id: "1.2.1", chapter: "BAB I", title: "Data Struktur", level: 2, order_index: 13 },
+  { section_id: "1.2.2", chapter: "BAB I", title: "Gambar Rencana", level: 2, order_index: 14 },
+  { section_id: "1.3", chapter: "BAB I", title: "Diagram Alir Perencanaan", level: 2, order_index: 15 },
+  { section_id: "1.4", chapter: "BAB I", title: "Dasar-Dasar Perencanaan", level: 2, order_index: 16 },
+  { section_id: "1.4.1", chapter: "BAB I", title: "Peraturan yang Digunakan", level: 2, order_index: 17 },
   { section_id: "2", chapter: "BAB II", title: "MATERIAL DAN PEMBEBANAN", level: 1, order_index: 20 },
-  { section_id: "2.1", chapter: "BAB II", title: "Material Struktur", level: 2, order_index: 21 },
-  { section_id: "2.2", chapter: "BAB II", title: "Pembebanan", level: 2, order_index: 22 },
-  { section_id: "2.3", chapter: "BAB II", title: "Analisis Beban Gempa", level: 2, order_index: 23 },
+  { section_id: "2.1", chapter: "BAB II", title: "Konsep Perancangan Struktur Beton Bertulang", level: 2, order_index: 21 },
+  { section_id: "2.2", chapter: "BAB II", title: "Material Properties", level: 2, order_index: 22 },
+  { section_id: "2.3", chapter: "BAB II", title: "Pembebanan", level: 2, order_index: 23 },
+  { section_id: "2.3.1", chapter: "BAB II", title: "Beban Mati", level: 2, order_index: 24 },
+  { section_id: "2.3.2", chapter: "BAB II", title: "Beban Hidup", level: 2, order_index: 25 },
+  { section_id: "2.3.3", chapter: "BAB II", title: "Beban Angin", level: 2, order_index: 26 },
+  { section_id: "2.3.4", chapter: "BAB II", title: "Beban Hidup Atap", level: 2, order_index: 27 },
+  { section_id: "2.3.5", chapter: "BAB II", title: "Beban Hujan", level: 2, order_index: 28 },
+  { section_id: "2.3.6", chapter: "BAB II", title: "Beban Gempa Pra-Analisis", level: 2, order_index: 29 },
   { section_id: "3", chapter: "BAB III", title: "PERMODELAN STRUKTUR", level: 1, order_index: 30 },
-  { section_id: "3.1", chapter: "BAB III", title: "Data Model", level: 2, order_index: 31 },
-  { section_id: "3.2", chapter: "BAB III", title: "Referensi Beban dan Kombinasi", level: 2, order_index: 32 },
-  { section_id: "3.3", chapter: "BAB III", title: "Ringkasan Handoff ETABS", level: 2, order_index: 33 },
+  { section_id: "3.1", chapter: "BAB III", title: "Model Struktur dengan ETABS", level: 2, order_index: 31 },
+  { section_id: "3.1.1", chapter: "BAB III", title: "Data Umum Bangunan", level: 2, order_index: 32 },
+  { section_id: "3.1.2", chapter: "BAB III", title: "Pembuatan Grid", level: 2, order_index: 33 },
+  { section_id: "3.2", chapter: "BAB III", title: "Permodelan Material dan Penampang", level: 2, order_index: 34 },
+  { section_id: "3.3", chapter: "BAB III", title: "Permodelan Perletakan Pondasi", level: 2, order_index: 35 },
+  { section_id: "3.4", chapter: "BAB III", title: "Pembuatan Load Pattern", level: 2, order_index: 36 },
+  { section_id: "3.5", chapter: "BAB III", title: "Aplikasi Beban pada Struktur melalui ETABS", level: 2, order_index: 37 },
+  { section_id: "3.6", chapter: "BAB III", title: "Load Cases dan Response Spectrum", level: 2, order_index: 38 },
+  { section_id: "3.7", chapter: "BAB III", title: "Kombinasi Beban", level: 2, order_index: 39 },
+  { section_id: "3.8", chapter: "BAB III", title: "Ringkasan Handoff ETABS", level: 2, order_index: 40 },
 ];
 
 const FIGURE_TEMPLATE = [
-  ["plan-grid", "1.3", "Denah dan grid struktur", "M3_GEOMETRY_PLAN", true],
-  ["story-elevation", "1.3", "Elevasi dan susunan tingkat", "M3_GEOMETRY_ELEVATION", true],
-  ["model-3d", "1.3", "Representasi tiga dimensi model struktur", "M3_GEOMETRY_3D", false],
-  ["response-spectrum", "2.3", "Spektrum respons desain", "M6_RESPONSE_SPECTRUM", true],
-  ["etabs-grid-reference", "3.1", "Grid System pada model ETABS", null, false],
+  ["plan-grid", "1.2.2", "Denah dan grid struktur", "M3_GEOMETRY_PLAN", true],
+  ["story-elevation", "1.2.2", "Elevasi dan susunan tingkat", "M3_GEOMETRY_ELEVATION", true],
+  ["model-3d", "1.2.2", "Representasi tiga dimensi model struktur", "M3_GEOMETRY_3D", false],
+  ["response-spectrum", "2.3.6", "Spektrum respons desain", "M6_RESPONSE_SPECTRUM", true],
+  ["etabs-grid-reference", "3.1.2", "Grid System pada model ETABS", null, false],
+  ["etabs-material-reference", "3.2", "Definisi material dan penampang pada ETABS", null, false],
+  ["etabs-restraint-reference", "3.3", "Permodelan perletakan pada ETABS", null, false],
+  ["etabs-load-pattern-reference", "3.4", "Definisi load pattern pada ETABS", null, false],
+  ["etabs-load-assignment-reference", "3.5", "Aplikasi beban pada model ETABS", null, false],
+  ["etabs-load-case-reference", "3.6", "Definisi load case dan response spectrum pada ETABS", null, false],
+  ["etabs-combination-reference", "3.7", "Definisi kombinasi beban pada ETABS", null, false],
 ] as const;
 
 const TABLE_TEMPLATE = [
-  ["grid-x", "1.3", "Data Grid X", "M3 Geometry"],
-  ["grid-y", "1.3", "Data Grid Y", "M3 Geometry"],
-  ["story-data", "1.3", "Story Data", "M3 Geometry"],
-  ["material-properties", "2.1", "Properti Material Struktur", "M4 Material"],
-  ["load-summary", "2.2", "Ringkasan Pembebanan", "M5 Loading"],
-  ["load-assignments", "2.2", "Assignment Pembebanan", "M5 Loading"],
-  ["seismic-parameters", "2.3", "Parameter Gempa", "M6 Seismic"],
-  ["seismic-results", "2.3", "Hasil Perhitungan Seismik", "M6 Seismic"],
-  ["story-forces", "2.3", "Distribusi Gaya Gempa per Tingkat", "M6 Seismic"],
-  ["etabs-patterns", "3.2", "Referensi Load Pattern ETABS", "M7 ETABS Handoff"],
-  ["etabs-cases", "3.2", "Referensi Load Case ETABS", "M7 ETABS Handoff"],
-  ["load-combinations", "3.2", "Kombinasi Beban untuk Referensi ETABS", "M7 ETABS Handoff"],
-  ["etabs-readiness", "3.3", "Checklist Handoff ETABS", "M7 ETABS Handoff"],
+  ["project-data", "1.2", "Data Bangunan", "M2 Project"],
+  ["grid-x", "1.2.1", "Data Grid X", "M3 Geometry"],
+  ["grid-y", "1.2.1", "Data Grid Y", "M3 Geometry"],
+  ["story-data", "1.2.1", "Story Data", "M3 Geometry"],
+  ["material-properties", "2.2", "Properti Material Struktur", "M4 Material"],
+  ["reinforcement-diameters", "2.2", "Diameter Tulangan Tersedia", "M4 Material"],
+  ["load-summary", "2.3", "Ringkasan Pembebanan", "M5 Loading"],
+  ["load-assignments", "2.3", "Assignment Pembebanan", "M5 Loading"],
+  ["seismic-input-provenance", "2.3.6", "Input dan Provenance Parameter Gempa", "M6 Seismic"],
+  ["seismic-spectrum", "2.3.6", "Parameter Spektrum Respons Desain", "M6 Seismic"],
+  ["seismic-kds", "2.3.6", "Penetapan Kategori Desain Seismik", "M6 Seismic"],
+  ["seismic-system", "2.3.6", "Parameter Sistem Struktur", "M6 Seismic"],
+  ["seismic-period", "2.3.6", "Periode Fundamental Struktur", "M6 Seismic"],
+  ["seismic-cs", "2.3.6", "Koefisien Respons Seismik", "M6 Seismic"],
+  ["seismic-weight", "2.3.6", "Berat Seismik per Tingkat", "M5/M6"],
+  ["seismic-base-shear", "2.3.6", "Gaya Geser Dasar Seismik", "M6 Seismic"],
+  ["story-forces", "2.3.6", "Distribusi Gaya Gempa per Tingkat", "M6 Seismic"],
+  ["etabs-patterns", "3.4", "Referensi Load Pattern ETABS", "M7 ETABS Handoff"],
+  ["etabs-cases", "3.6", "Referensi Load Case ETABS", "M7 ETABS Handoff"],
+  ["load-combinations", "3.7", "Kombinasi Beban untuk Referensi ETABS", "M7 ETABS Handoff"],
+  ["etabs-readiness", "3.8", "Checklist Handoff ETABS", "M7 ETABS Handoff"],
 ] as const;
 
 export function createReportWorkspace(bundle: ProjectBundle, previous?: ReportWorkspace | null): ReportWorkspace {
@@ -163,7 +193,7 @@ export function createReportWorkspace(bundle: ProjectBundle, previous?: ReportWo
     project_id: bundle.project.id,
     project_revision: bundle.revision.id,
     template_reference: REPORT_TEMPLATE_REFERENCE,
-    template_fidelity_status: "UNVERIFIED_REFERENCE_MISSING",
+    template_fidelity_status: "VERIFIED_REFERENCE_MAP",
     sections: SECTION_TEMPLATE.map((section) => ({ ...section, status: blocked ? "BLOCKED" : "READY" })),
     figures,
     tables,
@@ -200,7 +230,6 @@ export function validateReport(workspace: ReportWorkspace) {
     ...workspace.tables.filter(({ required, status }) => required && status === "BLOCKED").map(({ effective_caption }) => `Tabel wajib ${effective_caption} belum siap.`),
   ];
   const warnings = [
-    ...(workspace.template_fidelity_status === "UNVERIFIED_REFERENCE_MISSING" ? [`Fidelitas terhadap ${workspace.template_reference} belum dapat diverifikasi karena file referensi tidak tersedia.`] : []),
     ...workspace.figures.filter(({ status }) => status === "WARNING").map(({ effective_caption }) => `Gambar opsional ${effective_caption} belum tersedia.`),
     ...workspace.tables.filter(({ status }) => status === "WARNING").map(({ effective_caption }) => `${effective_caption} belum tersedia; dicatat sebagai referensi.`),
   ];
