@@ -104,7 +104,44 @@ export function ReportWorkspaceView() {
 
     {tab === "document" && <section><ReportHeading title="Dokumen" meta={`${workspace.template_reference} · CLONE → PATCH`} /><div className={`report-validation is-${validation.status.toLowerCase()}`}><strong>{validation.status}</strong><span>Master template terverifikasi</span><span>Revisi proyek {active.revision.revision_number}</span></div><div className="report-outline">{workspace.sections.map((section) => <article key={section.section_id} className={`level-${section.level}`}><span>{section.section_id === "front" ? "—" : section.section_id}</span><div><small>{section.chapter}</small><strong>{section.title}</strong></div><Status value={section.status} /></article>)}</div></section>}
 
-    {tab === "assumptions" && <section><ReportHeading title="Asumsi & Nilai Default" meta={`${assumptions.length} parameter aktif · Standar SNI 1726/1727/2847`} /><div className="table-scroll"><table className="seismic-table"><thead><tr><th>Kategori</th><th>Parameter</th><th>Nilai Aktif</th><th>Status</th><th>Rujukan Standar</th><th>Catatan</th></tr></thead><tbody>{assumptions.map((item, index) => <tr key={index}><td><strong>{item.category}</strong></td><td>{item.parameter}</td><td><code>{item.value}</code></td><td><span className={`etabs-status ${item.status === "DEFAULT_SNI" ? "is-ready" : "is-warning"}`}>{item.status === "DEFAULT_SNI" ? "DEFAULT SNI" : "OVERRIDE MANUAL"}</span></td><td>{item.standard_ref}</td><td><small>{item.note}</small></td></tr>)}</tbody></table></div></section>}
+    {tab === "assumptions" && <section>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "0.5rem" }}>
+        <ReportHeading title="Asumsi & Nilai Default" meta={`${assumptions.length} parameter aktif · Pelacakan SNI 1726:2019, SNI 1727:2020, SNI 2847:2019`} />
+        <button className="button button-secondary" type="button" onClick={() => window.print()}>Cetak / Simpan PDF</button>
+      </div>
+      {bundle.seismic.raw_inputs.site_class === "SF" && (
+        <div className="seismic-warning-banner" role="alert">
+          <strong>PERINGATAN KELAS SITUS SF:</strong>
+          Tanah kelas SF memerlukan penyelidikan geoteknik dan respons spesifik situs sesuai SNI 1726:2019 Pasal 6.10.1. Koefisien Fa dan Fv wajib diisi manual dari hasil penyelidikan tanah lapangan/laboratorium.
+        </div>
+      )}
+      <div className="table-scroll">
+        <table className="seismic-table">
+          <thead>
+            <tr>
+              <th>Kategori</th>
+              <th>Parameter</th>
+              <th>Nilai Aktif</th>
+              <th>Status</th>
+              <th>Rujukan Standar</th>
+              <th>Catatan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {assumptions.map((item, index) => (
+              <tr key={index}>
+                <td><strong>{item.category}</strong></td>
+                <td>{item.parameter}</td>
+                <td><code>{item.value}</code></td>
+                <td><span className={`etabs-status ${item.status === "DEFAULT_SNI" ? "is-ready" : "is-warning"}`}>{item.status === "DEFAULT_SNI" ? "DEFAULT SNI" : "OVERRIDE MANUAL"}</span></td>
+                <td>{item.standard_ref.includes("TODO") ? <span className="etabs-status is-warning">{item.standard_ref}</span> : item.standard_ref}</td>
+                <td><small>{item.note.includes("PERINGATAN") ? <span style={{ color: "#953d3d", fontWeight: "bold" }}>{item.note}</span> : item.note.includes("TODO") ? <span style={{ color: "#875d0c" }}>{item.note}</span> : item.note}</small></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>}
 
     {tab === "tables" && <section><ReportHeading title="Tabel Laporan" meta={`${workspace.tables.length} tabel dari data proyek`} /><div className="report-card-list">{workspace.tables.map((table) => <article key={table.table_id}><div className="report-card-head"><div><small>{table.section_id} · {table.source_module}</small><strong>{table.default_caption}</strong></div><Status value={table.status} /></div><label><span>Caption tabel</span><input value={table.caption_override} placeholder={table.default_caption} onChange={(event) => void apply(updateTableCaption(workspace, table.table_id, event.target.value))} /></label><small>table_id: {table.table_id} · revisi {table.data_revision}</small></article>)}</div></section>}
 

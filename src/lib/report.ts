@@ -299,28 +299,30 @@ export type AssumptionParameter = {
 export function deriveAssumptionsAndDefaults(bundle: ProjectBundle): AssumptionParameter[] {
   const items: AssumptionParameter[] = [];
 
-  // 1. Material - Berat jenis beton
+  // 1. Material - Berat jenis beton bertulang
   const density = bundle.materials.concrete.density.value;
   const isDefaultDensity = density === 2400;
   items.push({
     category: "Material",
     parameter: "Berat jenis beton (Density)",
     value: `${density ?? "—"} kg/m³`,
-    standard_ref: "SNI 1727:2020 Tabel C3.1-2 hlm. 282 (PDF hlm. 314)",
+    standard_ref: "TODO: verifikasi pasal (SNI 1727:2020 Tabel C3.1-2)",
     status: isDefaultDensity ? "DEFAULT_SNI" : "OVERRIDE_USER",
-    note: isDefaultDensity ? "Nilai standar beton bertulang (2.400 kg/m³)" : "Nilai disesuaikan oleh pengguna",
+    note: isDefaultDensity ? "TODO: verifikasi tabel berat jenis beton bertulang (2.400 kg/m³)" : "Nilai disesuaikan oleh pengguna",
   });
 
-  // 2. Material - Selimut beton
+  // 2. Material - Selimut beton (Cover)
   const cover = bundle.materials.concrete.cover.value;
   const isDefaultCover = cover === 40;
+  const coverElement = cover === 40 ? "Balok / Kolom" : cover === 20 ? "Pelat / Dinding" : cover === 75 ? "Fondasi (kontak tanah permanen)" : "Komponen struktur umum";
+  const coverExposure = cover === 75 ? "Dicor dan kontak permanen tanah" : cover === 50 ? "Terpapar cuaca langsung (D19–D57)" : "Tidak terpapar cuaca langsung / kontak tanah";
   items.push({
     category: "Material",
-    parameter: "Tebal selimut beton (Cover)",
-    value: `${cover ?? "—"} mm`,
+    parameter: `Tebal selimut beton (Cover: ${cover ?? "—"} mm)`,
+    value: `${cover ?? "—"} mm · ${coverElement} · ${coverExposure}`,
     standard_ref: "SNI 2847:2019 Tabel 20.6.1.3.1 hlm. 460 (PDF hlm. 482)",
     status: isDefaultCover ? "DEFAULT_SNI" : "OVERRIDE_USER",
-    note: isDefaultCover ? "Standar komponen balok/kolom tidak terpapar cuaca (40 mm)" : "Nilai disesuaikan oleh pengguna",
+    note: `Elemen: ${coverElement}; Kondisi paparan: ${coverExposure}`,
   });
 
   // 3. Material - Tulangan transversal fys
@@ -334,7 +336,7 @@ export function deriveAssumptionsAndDefaults(bundle: ProjectBundle): AssumptionP
     value: `${fys ?? "—"} MPa`,
     standard_ref: "SNI 2847:2019 Tabel 20.2.2.4a hlm. 450 (PDF hlm. 472)",
     status: isDefaultFys ? "DEFAULT_SNI" : "OVERRIDE_USER",
-    note: fys && fys > 420 ? "Melebihi batas izin geser (Maksimal 420 MPa)" : isDefaultFys ? "Mengikuti kuat leleh utama dengan batas 420 MPa" : "Nilai disesuaikan manual oleh pengguna",
+    note: fys && fys > 420 ? "Melebihi batas izin geser (Maksimal 420 MPa)" : isDefaultFys ? "Mengikuti kuat leleh utama dengan batas izin geser 420 MPa" : "Nilai disesuaikan manual oleh pengguna",
   });
 
   // 4. Pembebanan - Beban Hidup
@@ -347,7 +349,7 @@ export function deriveAssumptionsAndDefaults(bundle: ProjectBundle): AssumptionP
       value: `${liveDef.value ?? "—"} ${liveDef.unit}`,
       standard_ref: liveDef.source || "SNI 1727:2020 Tabel 4.3-1 hlm. 26 (PDF hlm. 58)",
       status: isLiveFromPreset ? "DEFAULT_SNI" : "OVERRIDE_USER",
-      note: liveDef.assumption || "Beban hidup seragam area lantai",
+      note: liveDef.assumption || "Beban hidup seragam area lantai hunian/kantor",
     });
   }
 
@@ -359,9 +361,9 @@ export function deriveAssumptionsAndDefaults(bundle: ProjectBundle): AssumptionP
       category: "Pembebanan",
       parameter: `Beban mati tambahan (${sidlDef.name})`,
       value: `${sidlDef.value ?? "—"} ${sidlDef.unit}`,
-      standard_ref: sidlDef.source || "SNI 1727:2020 Tabel C3.1-2 hlm. 282 (PDF hlm. 314)",
+      standard_ref: sidlDef.source || "SNI 1727:2020 Pasal 3.1.2 hlm. 17 (PDF hlm. 49)",
       status: isSidlFromPreset ? "DEFAULT_SNI" : "OVERRIDE_USER",
-      note: sidlDef.assumption || "Finishing spesi dan partisi",
+      note: sidlDef.assumption || "Finishing spesi dan partisi dinding",
     });
   }
 
@@ -381,25 +383,36 @@ export function deriveAssumptionsAndDefaults(bundle: ProjectBundle): AssumptionP
   });
 
   // 7. Seismik - Koefisien Situs Fa
-  const isFaManual = Boolean(bundle.seismic.raw_inputs.override_site_coefficients) || bundle.seismic.raw_inputs.site_class === "SF";
+  const isSfClass = bundle.seismic.raw_inputs.site_class === "SF";
+  const isFaManual = Boolean(bundle.seismic.raw_inputs.override_site_coefficients) || isSfClass;
+  const faSource = isSfClass ? "Manual (Wajib Uji Tanah SF)" : isFaManual ? "Manual (Override Pengguna)" : "Otomatis SNI 1726:2019";
   items.push({
     category: "Seismik",
-    parameter: "Koefisien situs Fa",
+    parameter: `Koefisien situs Fa [Sumber: ${faSource}]`,
     value: bundle.seismic.raw_inputs.fa !== null ? String(bundle.seismic.raw_inputs.fa) : "—",
     standard_ref: "SNI 1726:2019 Tabel 6 hlm. 34 (PDF hlm. 42)",
     status: isFaManual ? "OVERRIDE_USER" : "DEFAULT_SNI",
-    note: bundle.seismic.raw_inputs.site_class === "SF" ? "Wajib evaluasi geoteknik spesifik-situs (Pasal 6.10.1)" : isFaManual ? "Override manual pengguna" : "Interpolasi otomatis Tabel 6",
+    note: isSfClass
+      ? "PERINGATAN: Kelas situs SF wajib penyelidikan geoteknik spesifik-situs (SNI 1726:2019 Pasal 6.10.1)"
+      : isFaManual
+        ? "Override manual oleh pengguna"
+        : "Interpolasi otomatis Tabel 6",
   });
 
   // 8. Seismik - Koefisien Situs Fv
-  const isFvManual = Boolean(bundle.seismic.raw_inputs.override_site_coefficients) || bundle.seismic.raw_inputs.site_class === "SF";
+  const isFvManual = Boolean(bundle.seismic.raw_inputs.override_site_coefficients) || isSfClass;
+  const fvSource = isSfClass ? "Manual (Wajib Uji Tanah SF)" : isFvManual ? "Manual (Override Pengguna)" : "Otomatis SNI 1726:2019";
   items.push({
     category: "Seismik",
-    parameter: "Koefisien situs Fv",
+    parameter: `Koefisien situs Fv [Sumber: ${fvSource}]`,
     value: bundle.seismic.raw_inputs.fv !== null ? String(bundle.seismic.raw_inputs.fv) : "—",
     standard_ref: "SNI 1726:2019 Tabel 7 hlm. 34 (PDF hlm. 42)",
     status: isFvManual ? "OVERRIDE_USER" : "DEFAULT_SNI",
-    note: bundle.seismic.raw_inputs.site_class === "SF" ? "Wajib evaluasi geoteknik spesifik-situs (Pasal 6.10.1)" : isFvManual ? "Override manual pengguna" : "Interpolasi otomatis Tabel 7",
+    note: isSfClass
+      ? "PERINGATAN: Kelas situs SF wajib penyelidikan geoteknik spesifik-situs (SNI 1726:2019 Pasal 6.10.1)"
+      : isFvManual
+        ? "Override manual oleh pengguna"
+        : "Interpolasi otomatis Tabel 7",
   });
 
   // 9. Seismik - Kategori Risiko

@@ -161,10 +161,32 @@ test("deriveAssumptionsAndDefaults merekam 9 parameter inti, mendeteksi DEFAULT_
     assert.ok(item.status === "DEFAULT_SNI" || item.status === "OVERRIDE_USER");
   }
 
-  // Cek default material beton 2400 kg/m3 pada fixture standar
+  // Cek default material beton 2400 kg/m3 pada fixture standar bertanda TODO
   const density = items.find((i) => i.parameter.includes("Berat jenis"));
   assert.ok(density);
   assert.equal(density.status, "DEFAULT_SNI");
+  assert.match(density.standard_ref, /TODO/);
+
+  // Cek selimut beton memuat jenis elemen dan paparan
+  const cover = items.find((i) => i.parameter.includes("selimut beton"));
+  assert.ok(cover);
+  assert.match(cover.value, /Balok \/ Kolom/);
+  assert.match(cover.value, /Tidak terpapar cuaca/);
+  assert.match(cover.standard_ref, /SNI 2847:2019 Tabel 20.6.1.3.1 hlm. 460/);
+
+  // Cek sumber Fa/Fv
+  const fa = items.find((i) => i.parameter.startsWith("Koefisien situs Fa"));
+  assert.ok(fa);
+  assert.match(fa.parameter, /Otomatis SNI 1726:2019/);
+
+  // Jika kelas situs SF, tampil peringatan evaluasi geoteknik spesifik-situs
+  const sfBundle = structuredClone(bundle);
+  sfBundle.seismic.raw_inputs.site_class = "SF";
+  const sfItems = deriveAssumptionsAndDefaults(sfBundle);
+  const sfFa = sfItems.find((i) => i.parameter.startsWith("Koefisien situs Fa"));
+  assert.ok(sfFa);
+  assert.match(sfFa.note, /PERINGATAN: Kelas situs SF/);
+  assert.equal(sfFa.status, "OVERRIDE_USER");
 
   // Jika density diubah manual, status berubah menjadi OVERRIDE_USER
   const modified = structuredClone(bundle);
@@ -172,5 +194,14 @@ test("deriveAssumptionsAndDefaults merekam 9 parameter inti, mendeteksi DEFAULT_
   const modItems = deriveAssumptionsAndDefaults(modified);
   const modDensity = modItems.find((i) => i.parameter.includes("Berat jenis"));
   assert.equal(modDensity?.status, "OVERRIDE_USER");
+});
+
+test("DOCX menyertakan tabel Daftar Asumsi dan Nilai Default Perencanaan", () => {
+  const { bundle, snapshot } = createSnapshot();
+  const document = text(unzip(generateReportDocx({ bundle, snapshot, assets: [] })), "word/document.xml");
+  assert.match(document, /Daftar Asumsi dan Nilai Default Perencanaan/);
+  assert.match(document, /Berat jenis beton/);
+  assert.match(document, /Tebal selimut beton/);
+  assert.match(document, /Balok \/ Kolom/);
 });
 

@@ -5,7 +5,7 @@ import { createEtabsHandoff } from "./etabs-handoff.ts";
 import { spacingsFromOrdinates } from "./geometry.ts";
 import type { LoadCategory } from "./loads.ts";
 import type { ProjectBundle } from "./projects.ts";
-import type { ReportAsset, ReportFigure, ReportSnapshot } from "./report.ts";
+import { deriveAssumptionsAndDefaults, type ReportAsset, type ReportFigure, type ReportSnapshot } from "./report.ts";
 import { REPORT_MASTER_FILE, REPORT_TEMPLATE_MANIFEST } from "./report-template-manifest.ts";
 
 export type ReportGenerationInput = { bundle: ProjectBundle; snapshot: ReportSnapshot; assets: ReportAsset[] };
@@ -413,6 +413,23 @@ export function generateReportDocx(input: ReportGenerationInput) {
   narrative("Perencanaan memenuhi persyaratan kekuatan, kemampuan layan, stabilitas, daktilitas, dan durabilitas. Nilai input serta hasil perhitungan disajikan agar dapat ditelusuri.");
   section("1.4.1", "Peraturan yang Digunakan");
   narrative("Perencanaan mengacu pada SNI 2847:2019 untuk beton struktural, SNI 1727:2020 untuk beban desain minimum, serta SNI 1726:2019 untuk ketahanan gempa.");
+  narrative("Parameter default dan asumsi teknis yang digunakan pada tahap pra-analisis disajikan pada tabel berikut.");
+  blocks.push(
+    caption("Tabel", "Daftar Asumsi dan Nilai Default Perencanaan"),
+    sourceTable({
+      id: "assumptions-defaults",
+      headers: ["Kategori", "Parameter", "Nilai Aktif", "Status", "Rujukan Standar", "Catatan"],
+      rows: deriveAssumptionsAndDefaults(bundle).map((item) => [
+        item.category,
+        item.parameter,
+        item.value,
+        item.status === "DEFAULT_SNI" ? "Default SNI" : "Override Pengguna",
+        item.standard_ref,
+        item.note,
+      ]),
+    }, standardTable),
+    paragraph("", "3Normal", { firstLine: false })
+  );
 
   chapter("II", "MATERIAL DAN PEMBEBANAN");
   section("2.1", "Konsep Perancangan Struktur Beton Bertulang");
