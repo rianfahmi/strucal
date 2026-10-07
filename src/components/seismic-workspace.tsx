@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { calculateSeismicWeight } from "../lib/loads";
 import { getSeismicRegistry } from "../lib/seismic-registry";
-import { calculateSeismic, seismicContext, validateSeismicInput, type ManualSeismicInputKey, type SeismicModel, type TraceValue } from "../lib/seismic";
+import { calculateFa, calculateFv, calculateSeismic, getCoefficientSourceLabel, seismicContext, validateSeismicInput, type ManualSeismicInputKey, type SeismicModel, type TraceValue } from "../lib/seismic";
 import { ENGINE_VERSION } from "../lib/projects";
 import { useProjects, type SaveStatus } from "./project-provider";
 
@@ -33,6 +33,15 @@ function SeismicEditor({ initial, context, registryVersion, markUnsaved, saveSei
   const result = calculateSeismic(model, context, registry);
   const issues = validateSeismicInput(model);
 
+  const isSf = model.raw_inputs.site_class === "SF";
+  const isOverride = Boolean(model.raw_inputs.override_site_coefficients);
+  const isAutoFa = !isOverride && !isSf;
+  const isAutoFv = !isOverride && !isSf;
+  const faCalc = calculateFa(model.raw_inputs.site_class, model.raw_inputs.ss);
+  const fvCalc = calculateFv(model.raw_inputs.site_class, model.raw_inputs.s1);
+  const faSourceLabel = getCoefficientSourceLabel(model.input_provenance.fa.source);
+  const fvSourceLabel = getCoefficientSourceLabel(model.input_provenance.fv.source);
+
   useEffect(() => () => clearTimeout(timer.current), []);
 
   function apply(next: SeismicModel) {
@@ -43,8 +52,52 @@ function SeismicEditor({ initial, context, registryVersion, markUnsaved, saveSei
     timer.current = setTimeout(() => void saveSeismic(calculated, "autosave"), 800);
   }
 
-  function setRaw(key: keyof SeismicModel["raw_inputs"], value: string | number | null) {
-    apply({ ...model, raw_inputs: { ...model.raw_inputs, [key]: value }, selected_structural_system_id: null });
+  function setRaw(key: keyof SeismicModel["raw_inputs"], value: string | number | boolean | null) {
+    const nextRaw = { ...model.raw_inputs, [key]: value };
+    const nextProv = { ...model.input_provenance };
+
+    if (!nextRaw.override_site_coefficients && nextRaw.site_class !== "SF") {
+      if (key === "ss" || key === "site_class") {
+        const faRes = calculateFa(nextRaw.site_class, nextRaw.ss);
+        if (faRes.value !== null) {
+          nextRaw.fa = faRes.value;
+          nextProv.fa = { ...nextProv.fa, source: "otomatis SNI", entered_by: "SNI 1726:2019 Tabel 6" };
+        }
+      }
+      if (key === "s1" || key === "site_class") {
+        const fvRes = calculateFv(nextRaw.site_class, nextRaw.s1);
+        if (fvRes.value !== null) {
+          nextRaw.fv = fvRes.value;
+          nextProv.fv = { ...nextProv.fv, source: "otomatis SNI", entered_by: "SNI 1726:2019 Tabel 7" };
+        }
+      }
+    } else if (nextRaw.site_class === "SF" && key === "site_class") {
+      nextProv.fa = { ...nextProv.fa, source: "manual (spesifik situs SF)" };
+      nextProv.fv = { ...nextProv.fv, source: "manual (spesifik situs SF)" };
+    }
+
+    apply({ ...model, raw_inputs: nextRaw, input_provenance: nextProv, selected_structural_system_id: null });
+  }
+
+  function toggleOverride(enabled: boolean) {
+    const nextRaw = { ...model.raw_inputs, override_site_coefficients: enabled };
+    const nextProv = { ...model.input_provenance };
+    if (!enabled && nextRaw.site_class !== "SF") {
+      const faRes = calculateFa(nextRaw.site_class, nextRaw.ss);
+      const fvRes = calculateFv(nextRaw.site_class, nextRaw.s1);
+      if (faRes.value !== null) {
+        nextRaw.fa = faRes.value;
+        nextProv.fa = { ...nextProv.fa, source: "otomatis SNI", entered_by: "SNI 1726:2019 Tabel 6" };
+      }
+      if (fvRes.value !== null) {
+        nextRaw.fv = fvRes.value;
+        nextProv.fv = { ...nextProv.fv, source: "otomatis SNI", entered_by: "SNI 1726:2019 Tabel 7" };
+      }
+    } else if (enabled) {
+      nextProv.fa = { ...nextProv.fa, source: "manual" };
+      nextProv.fv = { ...nextProv.fv, source: "manual" };
+    }
+    apply({ ...model, raw_inputs: nextRaw, input_provenance: nextProv, selected_structural_system_id: null });
   }
 
   function setProvenance(key: ManualSeismicInputKey, field: "source" | "entered_by", value: string) {
@@ -62,18 +115,75 @@ function SeismicEditor({ initial, context, registryVersion, markUnsaved, saveSei
     </div>
 
     {tab === "input" && <section aria-labelledby="seismic-input-title">
-      <Heading id="seismic-input-title" title="Engineer / PUSKIM Input" badge="INPUT" />
-      <p className="seismic-input-note">Tidak ada lookup atau interpolasi otomatis untuk Site Class, Ss, S1, TL, Fa, dan Fv pada M6 V1.</p>
+      <Heading id="seismic-input-title" title="Parameter Seismik &amp; Koefisien Situs" badge={isOverride || isSf ? "MANUAL" : "AUTO SNI"} />
+      <p className="seismic-input-note">
+        Koefisien situs Fa dan Fv dihitung otomatis dengan interpolasi linier sesuai SNI 1726:2019 Tabel 6 dan Tabel 7 (hlm. 34). Override manual tersedia pada Pengaturan Lanjutan.
+      </p>
+
+      {isSf && <div className="seismic-warning-banner" role="alert">
+        <strong>⚠️ PERINGATAN KELAS SITUS SF:</strong>
+        <p>Kelas situs SF memerlukan evaluasi spesifik situs (investigasi geoteknik spesifik dan analisis respons spesifik-situs sesuai SNI 1726:2019 Pasal 6.10.1 &amp; Catatan a Tabel 6/7). Nilai Fa dan Fv tidak dapat dihitung otomatis dan wajib diisi manual dari laporan geoteknik.</p>
+      </div>}
+
+      {(faCalc.notice || fvCalc.notice) && !isSf && <div className="seismic-notice-banner" role="status">
+        {faCalc.notice && <p>ℹ️ {faCalc.notice}</p>}
+        {fvCalc.notice && <p>ℹ️ {fvCalc.notice}</p>}
+      </div>}
+
       <div className="seismic-input-grid">
+        <SelectInput label="Kelas situs" value={model.raw_inputs.site_class} options={["SA", "SB", "SC", "SD", "SE", "SF"]} issue={issues.find(({ path }) => path === "raw_inputs.site_class")?.message} onChange={(value) => setRaw("site_class", value)} />
+        <SelectInput label="Kategori risiko" value={model.raw_inputs.risk_category} options={["I", "II", "III", "IV"]} issue={issues.find(({ path }) => path === "raw_inputs.risk_category")?.message} onChange={(value) => setRaw("risk_category", value)} />
         <NumberInput label="Ss" value={model.raw_inputs.ss} unit="g" issue={issues.find(({ path }) => path === "raw_inputs.ss")?.message} onChange={(value) => setRaw("ss", value)} />
         <NumberInput label="S1" value={model.raw_inputs.s1} unit="g" issue={issues.find(({ path }) => path === "raw_inputs.s1")?.message} onChange={(value) => setRaw("s1", value)} />
         <NumberInput label="TL" value={model.raw_inputs.tl} unit="s" issue={issues.find(({ path }) => path === "raw_inputs.tl")?.message} onChange={(value) => setRaw("tl", value)} />
-        <NumberInput label="Fa" value={model.raw_inputs.fa} unit="-" issue={issues.find(({ path }) => path === "raw_inputs.fa")?.message} onChange={(value) => setRaw("fa", value)} />
-        <NumberInput label="Fv" value={model.raw_inputs.fv} unit="-" issue={issues.find(({ path }) => path === "raw_inputs.fv")?.message} onChange={(value) => setRaw("fv", value)} />
-        <SelectInput label="Kelas situs" value={model.raw_inputs.site_class} options={["SA", "SB", "SC", "SD", "SE", "SF"]} issue={issues.find(({ path }) => path === "raw_inputs.site_class")?.message} onChange={(value) => setRaw("site_class", value)} />
-        <SelectInput label="Kategori risiko" value={model.raw_inputs.risk_category} options={["I", "II", "III", "IV"]} issue={issues.find(({ path }) => path === "raw_inputs.risk_category")?.message} onChange={(value) => setRaw("risk_category", value)} />
+
+        {isAutoFa ? (
+          <label className="material-field">
+            <span>Fa (koefisien situs)</span>
+            <div className="number-with-unit">
+              <input type="number" readOnly disabled value={model.raw_inputs.fa ?? ""} />
+              <span>-</span>
+              <small className="badge badge-auto">otomatis SNI</small>
+            </div>
+            <small className="field-note">Interpolasi Tabel 6 (SNI 1726:2019 hlm. 34)</small>
+          </label>
+        ) : (
+          <NumberInput label="Fa (koefisien situs)" value={model.raw_inputs.fa} unit="-" issue={issues.find(({ path }) => path === "raw_inputs.fa")?.message} sourceLabel="manual" onChange={(value) => setRaw("fa", value)} />
+        )}
+
+        {isAutoFv ? (
+          <label className="material-field">
+            <span>Fv (koefisien situs)</span>
+            <div className="number-with-unit">
+              <input type="number" readOnly disabled value={model.raw_inputs.fv ?? ""} />
+              <span>-</span>
+              <small className="badge badge-auto">otomatis SNI</small>
+            </div>
+            <small className="field-note">Interpolasi Tabel 7 (SNI 1726:2019 hlm. 34)</small>
+          </label>
+        ) : (
+          <NumberInput label="Fv (koefisien situs)" value={model.raw_inputs.fv} unit="-" issue={issues.find(({ path }) => path === "raw_inputs.fv")?.message} sourceLabel="manual" onChange={(value) => setRaw("fv", value)} />
+        )}
       </div>
-      <ProvenanceTable model={model} issues={issues} onChange={setProvenance} />
+
+      <details className="advanced-settings">
+        <summary>Pengaturan Lanjutan &amp; Override Manual</summary>
+        <div className="advanced-settings-content">
+          <label className="override-checkbox">
+            <input
+              type="checkbox"
+              checked={isOverride}
+              onChange={(e) => toggleOverride(e.target.checked)}
+            />{" "}
+            <strong>Override manual koefisien situs (Fa dan Fv)</strong>
+            <p className="seismic-input-note" style={{ margin: "0.25rem 0 0" }}>
+              Aktifkan jika Anda ingin memasukkan nilai Fa dan Fv manual dari laporan respons spesifik situs (Pasal 6.10.1) atau PUSKIM.
+            </p>
+          </label>
+          <ProvenanceTable model={model} issues={issues} onChange={setProvenance} />
+        </div>
+      </details>
+
       <div className="auto-calculated-list"><strong>AUTO CALCULATED</strong><span>SMS · SM1 · SDS · SD1 · T0 · Ts · KDS · validasi sistem · R/Ω0/Cd · Ct/x · Ta · Cu · Tmax · Cs · V · Fx · response spectrum</span></div>
       <div className="seismic-inherited">
         <article><span>Tinggi bangunan</span><strong>{context.building_height.toFixed(3)} m</strong><small className="badge badge-inherited">INHERITED · Geometry</small></article>
@@ -82,7 +192,7 @@ function SeismicEditor({ initial, context, registryVersion, markUnsaved, saveSei
     </section>}
 
     {tab === "spectrum" && <section aria-labelledby="seismic-spectrum-title"><Heading id="seismic-spectrum-title" title="Parameter Spektrum" badge="CODE + AUTO" />
-      {result.spectrum ? <div className="trace-grid"><TraceCard label="Fa" trace={result.coefficients!.fa} /><TraceCard label="Fv" trace={result.coefficients!.fv} />{Object.entries(result.spectrum).map(([label, trace]) => <TraceCard key={label} label={label.toUpperCase()} trace={trace} />)}</div> : <RegistryBlock status={result.status} warnings={result.warnings} />}
+      {result.spectrum ? <div className="trace-grid"><TraceCard label={`Fa (${faSourceLabel})`} trace={result.coefficients!.fa} /><TraceCard label={`Fv (${fvSourceLabel})`} trace={result.coefficients!.fv} />{Object.entries(result.spectrum).map(([label, trace]) => <TraceCard key={label} label={label.toUpperCase()} trace={trace} />)}</div> : <RegistryBlock status={result.status} warnings={result.warnings} />}
     </section>}
 
     {tab === "kds" && <section aria-labelledby="seismic-kds-title"><Heading id="seismic-kds-title" title="Review KDS" badge="AUTO" />
@@ -118,8 +228,8 @@ function Heading({ id, title, badge }: { id: string; title: string; badge: strin
   return <div className="data-section-heading"><div><p className="eyebrow">Analisa Gempa</p><h2 id={id}>{title}</h2></div><span className="badge badge-code">{badge}</span></div>;
 }
 
-function NumberInput({ label, value, unit, issue, onChange }: { label: string; value: number | null; unit: string; issue?: string; onChange: (value: number | null) => void }) {
-  return <label className="material-field"><span>{label}</span><div className="number-with-unit"><input type="number" min="0" step="any" value={value ?? ""} aria-invalid={Boolean(issue)} onChange={(event) => onChange(event.target.value === "" ? null : Number(event.target.value))} /><span>{unit}</span><small>INPUT</small></div>{issue && <small className="field-error">{issue}</small>}</label>;
+function NumberInput({ label, value, unit, issue, sourceLabel = "INPUT", onChange }: { label: string; value: number | null; unit: string; issue?: string; sourceLabel?: string; onChange: (value: number | null) => void }) {
+  return <label className="material-field"><span>{label}</span><div className="number-with-unit"><input type="number" min="0" step="any" value={value ?? ""} aria-invalid={Boolean(issue)} onChange={(event) => onChange(event.target.value === "" ? null : Number(event.target.value))} /><span>{unit}</span><small>{sourceLabel}</small></div>{issue && <small className="field-error">{issue}</small>}</label>;
 }
 
 function SelectInput({ label, value, options, issue, onChange }: { label: string; value: string; options: string[]; issue?: string; onChange: (value: string) => void }) {

@@ -324,6 +324,15 @@ h1, h2, p { margin: 0; }
 .seismic-validation { display: grid; gap: .35rem; padding: .75rem; border-radius: .4rem; font-size: .68rem; }
 .seismic-validation.is-valid { border: 1px solid #cce1d8; background: #f0f8f4; color: #29614f; }
 .seismic-validation.has-error { border: 1px solid #ead7aa; background: #fff9eb; color: #74530f; }
+.seismic-warning-banner { margin-bottom: .85rem; padding: .75rem .85rem; border: 1px solid #eab3b3; border-radius: .4rem; background: #fff5f5; color: #912d2d; font-size: .72rem; line-height: 1.5; }
+.seismic-warning-banner strong { display: block; margin-bottom: .25rem; font-size: .74rem; color: #842323; }
+.seismic-notice-banner { margin-bottom: .85rem; padding: .65rem .85rem; border: 1px solid #c2dbd0; border-radius: .4rem; background: #f0f8f4; color: #1c5243; font-size: .72rem; line-height: 1.5; }
+.advanced-settings { margin-top: 1rem; border: 1px solid #e1e7e4; border-radius: .45rem; background: #fafcfb; }
+.advanced-settings summary { padding: .7rem .9rem; font-weight: 700; font-size: .74rem; color: #1c5243; cursor: pointer; user-select: none; }
+.advanced-settings-content { padding: 0 .9rem .9rem; display: grid; gap: .75rem; }
+.override-checkbox { display: block; font-size: .72rem; color: #3b4d46; cursor: pointer; }
+.override-checkbox input { margin-right: .4rem; }
+.field-note { display: block; margin-top: .25rem; color: #58746b; font-size: .62rem; }
 .save-seismic { width: 100%; margin-top: 1rem; }
 
 .etabs-page { width: min(106rem, 100%); }

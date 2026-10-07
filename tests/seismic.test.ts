@@ -2,7 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createDefaultGeometry } from "../src/lib/geometry.ts";
 import { calculateCu, getSeismicRegistry } from "../src/lib/seismic-registry.ts";
-import { calculateSeismic, createDefaultSeismic, evaluateResponseSpectrum, seismicContext, type SeismicModel } from "../src/lib/seismic.ts";
+import {
+  calculateFa,
+  calculateFv,
+  calculateSeismic,
+  createDefaultSeismic,
+  evaluateResponseSpectrum,
+  getCoefficientSourceLabel,
+  seismicContext,
+  syncSiteCoefficients,
+  type SeismicModel,
+} from "../src/lib/seismic.ts";
 
 const closeTo = (actual: number, expected: number, tolerance = 1e-12) => assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} != ${expected}`);
 
@@ -154,4 +164,211 @@ test("registry final approved dan pipeline memiliki provenance lengkap", () => {
   assert.equal(result.status, "VALID");
   assert.equal(result.base_shear?.registry_version, registryVersion);
   assert.equal(result.base_shear?.engine_version, "test-engine");
+});
+
+test("Tabel 6 Fa: setiap sel diuji dengan nilai hardcoded langsung", () => {
+  // Baris SA: semua 0.8
+  assert.equal(calculateFa("SA", 0.25).value, 0.8);
+  assert.equal(calculateFa("SA", 0.50).value, 0.8);
+  assert.equal(calculateFa("SA", 0.75).value, 0.8);
+  assert.equal(calculateFa("SA", 1.00).value, 0.8);
+  assert.equal(calculateFa("SA", 1.25).value, 0.8);
+  assert.equal(calculateFa("SA", 1.50).value, 0.8);
+
+  // Baris SB: semua 0.9
+  assert.equal(calculateFa("SB", 0.25).value, 0.9);
+  assert.equal(calculateFa("SB", 0.50).value, 0.9);
+  assert.equal(calculateFa("SB", 0.75).value, 0.9);
+  assert.equal(calculateFa("SB", 1.00).value, 0.9);
+  assert.equal(calculateFa("SB", 1.25).value, 0.9);
+  assert.equal(calculateFa("SB", 1.50).value, 0.9);
+
+  // Baris SC: [1.3, 1.3, 1.2, 1.2, 1.2, 1.2]
+  assert.equal(calculateFa("SC", 0.25).value, 1.3);
+  assert.equal(calculateFa("SC", 0.50).value, 1.3);
+  assert.equal(calculateFa("SC", 0.75).value, 1.2);
+  assert.equal(calculateFa("SC", 1.00).value, 1.2);
+  assert.equal(calculateFa("SC", 1.25).value, 1.2);
+  assert.equal(calculateFa("SC", 1.50).value, 1.2);
+
+  // Baris SD: [1.6, 1.4, 1.2, 1.1, 1.0, 1.0]
+  assert.equal(calculateFa("SD", 0.25).value, 1.6);
+  assert.equal(calculateFa("SD", 0.50).value, 1.4);
+  assert.equal(calculateFa("SD", 0.75).value, 1.2);
+  assert.equal(calculateFa("SD", 1.00).value, 1.1);
+  assert.equal(calculateFa("SD", 1.25).value, 1.0);
+  assert.equal(calculateFa("SD", 1.50).value, 1.0);
+
+  // Baris SE: [2.4, 1.7, 1.3, 1.1, 0.9, 0.8]
+  assert.equal(calculateFa("SE", 0.25).value, 2.4);
+  assert.equal(calculateFa("SE", 0.50).value, 1.7);
+  assert.equal(calculateFa("SE", 0.75).value, 1.3);
+  assert.equal(calculateFa("SE", 1.00).value, 1.1);
+  assert.equal(calculateFa("SE", 1.25).value, 0.9);
+  assert.equal(calculateFa("SE", 1.50).value, 0.8);
+
+  // Baris SF: wajib null & status MANUAL_REQUIRED
+  for (const ss of [0.25, 0.50, 0.75, 1.00, 1.25, 1.50]) {
+    const res = calculateFa("SF", ss);
+    assert.equal(res.value, null);
+    assert.equal(res.status, "MANUAL_REQUIRED");
+    assert.match(res.warning ?? "", /6\.10\.1/);
+  }
+});
+
+test("Tabel 7 Fv: setiap sel diuji dengan nilai hardcoded langsung", () => {
+  // Baris SA: semua 0.8
+  assert.equal(calculateFv("SA", 0.10).value, 0.8);
+  assert.equal(calculateFv("SA", 0.20).value, 0.8);
+  assert.equal(calculateFv("SA", 0.30).value, 0.8);
+  assert.equal(calculateFv("SA", 0.40).value, 0.8);
+  assert.equal(calculateFv("SA", 0.50).value, 0.8);
+  assert.equal(calculateFv("SA", 0.60).value, 0.8);
+
+  // Baris SB: semua 0.8
+  assert.equal(calculateFv("SB", 0.10).value, 0.8);
+  assert.equal(calculateFv("SB", 0.20).value, 0.8);
+  assert.equal(calculateFv("SB", 0.30).value, 0.8);
+  assert.equal(calculateFv("SB", 0.40).value, 0.8);
+  assert.equal(calculateFv("SB", 0.50).value, 0.8);
+  assert.equal(calculateFv("SB", 0.60).value, 0.8);
+
+  // Baris SC: [1.5, 1.5, 1.5, 1.5, 1.5, 1.4]
+  assert.equal(calculateFv("SC", 0.10).value, 1.5);
+  assert.equal(calculateFv("SC", 0.20).value, 1.5);
+  assert.equal(calculateFv("SC", 0.30).value, 1.5);
+  assert.equal(calculateFv("SC", 0.40).value, 1.5);
+  assert.equal(calculateFv("SC", 0.50).value, 1.5);
+  assert.equal(calculateFv("SC", 0.60).value, 1.4);
+
+  // Baris SD: [2.4, 2.2, 2.0, 1.9, 1.8, 1.7]
+  assert.equal(calculateFv("SD", 0.10).value, 2.4);
+  assert.equal(calculateFv("SD", 0.20).value, 2.2);
+  assert.equal(calculateFv("SD", 0.30).value, 2.0);
+  assert.equal(calculateFv("SD", 0.40).value, 1.9);
+  assert.equal(calculateFv("SD", 0.50).value, 1.8);
+  assert.equal(calculateFv("SD", 0.60).value, 1.7);
+
+  // Baris SE: [4.2, 3.3, 2.8, 2.4, 2.2, 2.0]
+  assert.equal(calculateFv("SE", 0.10).value, 4.2);
+  assert.equal(calculateFv("SE", 0.20).value, 3.3);
+  assert.equal(calculateFv("SE", 0.30).value, 2.8);
+  assert.equal(calculateFv("SE", 0.40).value, 2.4);
+  assert.equal(calculateFv("SE", 0.50).value, 2.2);
+  assert.equal(calculateFv("SE", 0.60).value, 2.0);
+
+  // Baris SF: wajib null & status MANUAL_REQUIRED
+  for (const s1 of [0.10, 0.20, 0.30, 0.40, 0.50, 0.60]) {
+    const res = calculateFv("SF", s1);
+    assert.equal(res.value, null);
+    assert.equal(res.status, "MANUAL_REQUIRED");
+    assert.match(res.warning ?? "", /6\.10\.1/);
+  }
+});
+
+test("interpolasi linier titik tengah Fa dan Fv sesuai hitungan manual", () => {
+  // Fa midpoints
+  assert.equal(calculateFa("SA", 0.375).value, 0.8);
+  assert.equal(calculateFa("SB", 0.625).value, 0.9);
+  assert.equal(calculateFa("SC", 0.375).value, 1.3);
+  assert.equal(calculateFa("SC", 0.625).value, 1.25);
+  assert.equal(calculateFa("SC", 0.875).value, 1.2);
+  assert.equal(calculateFa("SD", 0.375).value, 1.5);
+  assert.equal(calculateFa("SD", 0.625).value, 1.3);
+  assert.equal(calculateFa("SD", 0.875).value, 1.15);
+  assert.equal(calculateFa("SD", 1.125).value, 1.05);
+  assert.equal(calculateFa("SD", 1.375).value, 1.0);
+  assert.equal(calculateFa("SE", 0.375).value, 2.05);
+  assert.equal(calculateFa("SE", 0.625).value, 1.5);
+  assert.equal(calculateFa("SE", 0.875).value, 1.2);
+  assert.equal(calculateFa("SE", 1.125).value, 1.0);
+  assert.equal(calculateFa("SE", 1.375).value, 0.85);
+
+  // Fv midpoints
+  assert.equal(calculateFv("SA", 0.15).value, 0.8);
+  assert.equal(calculateFv("SB", 0.25).value, 0.8);
+  assert.equal(calculateFv("SC", 0.15).value, 1.5);
+  assert.equal(calculateFv("SC", 0.55).value, 1.45);
+  assert.equal(calculateFv("SD", 0.15).value, 2.3);
+  assert.equal(calculateFv("SD", 0.25).value, 2.1);
+  assert.equal(calculateFv("SD", 0.35).value, 1.95);
+  assert.equal(calculateFv("SD", 0.45).value, 1.85);
+  assert.equal(calculateFv("SD", 0.55).value, 1.75);
+  assert.equal(calculateFv("SE", 0.15).value, 3.75);
+  assert.equal(calculateFv("SE", 0.25).value, 3.05);
+  assert.equal(calculateFv("SE", 0.35).value, 2.6);
+  assert.equal(calculateFv("SE", 0.45).value, 2.3);
+  assert.equal(calculateFv("SE", 0.55).value, 2.1);
+});
+
+test("perlakuan batas dan nilai di luar rentang Tabel 6 dan 7", () => {
+  // Nilai tepat di batas tidak memunculkan notice
+  const faExactLower = calculateFa("SD", 0.25);
+  assert.equal(faExactLower.value, 1.6);
+  assert.equal(faExactLower.isOutOfRange, false);
+  assert.equal(faExactLower.notice, null);
+
+  const faExactUpper = calculateFa("SD", 1.50);
+  assert.equal(faExactUpper.value, 1.0);
+  assert.equal(faExactUpper.isOutOfRange, false);
+  assert.equal(faExactUpper.notice, null);
+
+  const fvExactLower = calculateFv("SD", 0.10);
+  assert.equal(fvExactLower.value, 2.4);
+  assert.equal(fvExactLower.isOutOfRange, false);
+  assert.equal(fvExactLower.notice, null);
+
+  const fvExactUpper = calculateFv("SD", 0.60);
+  assert.equal(fvExactUpper.value, 1.7);
+  assert.equal(fvExactUpper.isOutOfRange, false);
+  assert.equal(fvExactUpper.notice, null);
+
+  // Nilai di bawah batas bawah
+  const faUnder = calculateFa("SD", 0.15);
+  assert.equal(faUnder.value, 1.6);
+  assert.equal(faUnder.isOutOfRange, true);
+  assert.match(faUnder.notice ?? "", /di bawah batas Tabel 6/);
+
+  const fvUnder = calculateFv("SD", 0.05);
+  assert.equal(fvUnder.value, 2.4);
+  assert.equal(fvUnder.isOutOfRange, true);
+  assert.match(fvUnder.notice ?? "", /di bawah batas Tabel 7/);
+
+  // Nilai di atas batas atas
+  const faOver = calculateFa("SD", 1.80);
+  assert.equal(faOver.value, 1.0);
+  assert.equal(faOver.isOutOfRange, true);
+  assert.match(faOver.notice ?? "", /di atas batas Tabel 6/);
+
+  const fvOver = calculateFv("SD", 0.75);
+  assert.equal(fvOver.value, 1.7);
+  assert.equal(fvOver.isOutOfRange, true);
+  assert.match(fvOver.notice ?? "", /di atas batas Tabel 7/);
+});
+
+test("sinkronisasi otomatis dan override manual koefisien situs", () => {
+  const model = createDefaultSeismic("rev-1", registryVersion);
+  model.raw_inputs.site_class = "SD";
+  model.raw_inputs.ss = 0.75;
+  model.raw_inputs.s1 = 0.3;
+
+  // Sync otomatis
+  const synced = syncSiteCoefficients(model);
+  assert.equal(synced.raw_inputs.fa, 1.2);
+  assert.equal(synced.raw_inputs.fv, 2.0);
+  assert.equal(synced.input_provenance.fa.source, "otomatis SNI");
+  assert.equal(synced.input_provenance.fv.source, "otomatis SNI");
+  assert.equal(getCoefficientSourceLabel(synced.input_provenance.fa.source), "otomatis SNI");
+
+  // Manual override aktif
+  synced.raw_inputs.override_site_coefficients = true;
+  synced.raw_inputs.fa = 1.35;
+  synced.raw_inputs.fv = 2.15;
+  synced.input_provenance.fa.source = "manual";
+  synced.input_provenance.fv.source = "manual";
+
+  const preserved = syncSiteCoefficients(synced);
+  assert.equal(preserved.raw_inputs.fa, 1.35);
+  assert.equal(preserved.raw_inputs.fv, 2.15);
+  assert.equal(getCoefficientSourceLabel(preserved.input_provenance.fa.source), "manual");
 });

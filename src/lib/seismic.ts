@@ -4,7 +4,7 @@ import type { DesignSpectrum, KdsReview, PeriodResult, ResponseCoefficientResult
 
 export type ManualSeismicInputKey = "site_class" | "ss" | "s1" | "tl" | "fa" | "fv";
 export type InputProvenance = { source: string; entered_by: string; status: "INPUT"; project_revision: string };
-export type SeismicRawInputs = { ss: number | null; s1: number | null; tl: number | null; fa: number | null; fv: number | null; site_class: string; risk_category: string };
+export type SeismicRawInputs = { ss: number | null; s1: number | null; tl: number | null; fa: number | null; fv: number | null; site_class: string; risk_category: string; override_site_coefficients?: boolean };
 export type SeismicInputProvenance = Record<ManualSeismicInputKey, InputProvenance>;
 export type SeismicEngineeringOptions = {
   moment_frame_carries_all_seismic_force: boolean;
@@ -75,11 +75,283 @@ function defaultEngineeringOptions(): SeismicEngineeringOptions {
   };
 }
 
+export const SITE_COEFFICIENT_REFERENCE = "SNI 1726:2019 hlm. 34 (PDF hlm. 42)";
+
+export type SiteClass = "SA" | "SB" | "SC" | "SD" | "SE" | "SF";
+
+export const TABLE_6_FA = {
+  reference: "SNI 1726:2019 hlm. 34 (PDF hlm. 42) Tabel 6",
+  ss_keys: [0.25, 0.5, 0.75, 1.0, 1.25, 1.5] as const,
+  table: {
+    SA: [0.8, 0.8, 0.8, 0.8, 0.8, 0.8],
+    SB: [0.9, 0.9, 0.9, 0.9, 0.9, 0.9],
+    SC: [1.3, 1.3, 1.2, 1.2, 1.2, 1.2],
+    SD: [1.6, 1.4, 1.2, 1.1, 1.0, 1.0],
+    SE: [2.4, 1.7, 1.3, 1.1, 0.9, 0.8],
+    SF: [null, null, null, null, null, null],
+  } satisfies Record<SiteClass, (number | null)[]>,
+  footnotes: {
+    SF: "Situs yang memerlukan investigasi geoteknik spesifik dan analisis respons situs-spesifik, lihat 6.10.1",
+  },
+} as const;
+
+export const TABLE_7_FV = {
+  reference: "SNI 1726:2019 hlm. 34 (PDF hlm. 42) Tabel 7",
+  s1_keys: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6] as const,
+  table: {
+    SA: [0.8, 0.8, 0.8, 0.8, 0.8, 0.8],
+    SB: [0.8, 0.8, 0.8, 0.8, 0.8, 0.8],
+    SC: [1.5, 1.5, 1.5, 1.5, 1.5, 1.4],
+    SD: [2.4, 2.2, 2.0, 1.9, 1.8, 1.7],
+    SE: [4.2, 3.3, 2.8, 2.4, 2.2, 2.0],
+    SF: [null, null, null, null, null, null],
+  } satisfies Record<SiteClass, (number | null)[]>,
+  footnotes: {
+    SF: "Situs yang memerlukan investigasi geoteknik spesifik dan analisis respons situs-spesifik, lihat 6.10.1",
+  },
+} as const;
+
+export const SITE_COEFFICIENTS_DATA = {
+  reference: SITE_COEFFICIENT_REFERENCE,
+  fa: TABLE_6_FA,
+  fv: TABLE_7_FV,
+} as const;
+
+export type SiteCoefficientResult = {
+  value: number | null;
+  status: "AUTOMATIC" | "MANUAL_REQUIRED" | "INVALID";
+  isOutOfRange: boolean;
+  notice: string | null;
+  warning: string | null;
+  source: "otomatis SNI" | "manual";
+};
+
+export function calculateFa(siteClass: string, ss: number | null): SiteCoefficientResult {
+  if (siteClass === "SF") {
+    return {
+      value: null,
+      status: "MANUAL_REQUIRED",
+      isOutOfRange: false,
+      notice: null,
+      warning: "Kelas situs SF memerlukan evaluasi spesifik situs (investigasi geoteknik dan analisis respons situs-spesifik sesuai SNI 1726:2019 Pasal 6.10.1 & Tabel 6 Catatan a). Nilai Fa tidak dihitung otomatis dan wajib diisi manual dari laporan geoteknik.",
+      source: "manual",
+    };
+  }
+
+  const validClasses = ["SA", "SB", "SC", "SD", "SE"] as const;
+  if (!validClasses.includes(siteClass as (typeof validClasses)[number])) {
+    return {
+      value: null,
+      status: "INVALID",
+      isOutOfRange: false,
+      notice: null,
+      warning: "Pilih kelas situs yang valid (SA–SF).",
+      source: "manual",
+    };
+  }
+
+  if (ss === null || !Number.isFinite(ss) || ss < 0) {
+    return {
+      value: null,
+      status: "INVALID",
+      isOutOfRange: false,
+      notice: null,
+      warning: "Nilai Ss harus berupa angka nol atau lebih.",
+      source: "manual",
+    };
+  }
+
+  const row = TABLE_6_FA.table[siteClass as keyof typeof TABLE_6_FA.table] as readonly number[];
+  const keys = TABLE_6_FA.ss_keys;
+
+  if (ss <= keys[0]) {
+    const isUnder = ss < keys[0];
+    return {
+      value: row[0],
+      status: "AUTOMATIC",
+      isOutOfRange: isUnder,
+      notice: isUnder ? `Nilai Ss (${ss} g) berada di bawah batas Tabel 6 (${keys[0]} g); menggunakan nilai batas kolom pertama (${row[0]}).` : null,
+      warning: null,
+      source: "otomatis SNI",
+    };
+  }
+
+  const lastIndex = keys.length - 1;
+  if (ss >= keys[lastIndex]) {
+    const isOver = ss > keys[lastIndex];
+    return {
+      value: row[lastIndex],
+      status: "AUTOMATIC",
+      isOutOfRange: isOver,
+      notice: isOver ? `Nilai Ss (${ss} g) berada di atas batas Tabel 6 (${keys[lastIndex]} g); menggunakan nilai batas kolom akhir (${row[lastIndex]}).` : null,
+      warning: null,
+      source: "otomatis SNI",
+    };
+  }
+
+  for (let i = 0; i < lastIndex; i++) {
+    const x0 = keys[i];
+    const x1 = keys[i + 1];
+    if (ss >= x0 && ss <= x1) {
+      const y0 = row[i];
+      const y1 = row[i + 1];
+      const interpolated = y0 + ((ss - x0) / (x1 - x0)) * (y1 - y0);
+      return {
+        value: Math.round(interpolated * 10000) / 10000,
+        status: "AUTOMATIC",
+        isOutOfRange: false,
+        notice: null,
+        warning: null,
+        source: "otomatis SNI",
+      };
+    }
+  }
+
+  return {
+    value: null,
+    status: "INVALID",
+    isOutOfRange: false,
+    notice: null,
+    warning: "Gagal menginterpolasi nilai Fa.",
+    source: "manual",
+  };
+}
+
+export function calculateFv(siteClass: string, s1: number | null): SiteCoefficientResult {
+  if (siteClass === "SF") {
+    return {
+      value: null,
+      status: "MANUAL_REQUIRED",
+      isOutOfRange: false,
+      notice: null,
+      warning: "Kelas situs SF memerlukan evaluasi spesifik situs (investigasi geoteknik dan analisis respons situs-spesifik sesuai SNI 1726:2019 Pasal 6.10.1 & Tabel 7 Catatan a). Nilai Fv tidak dihitung otomatis dan wajib diisi manual dari laporan geoteknik.",
+      source: "manual",
+    };
+  }
+
+  const validClasses = ["SA", "SB", "SC", "SD", "SE"] as const;
+  if (!validClasses.includes(siteClass as (typeof validClasses)[number])) {
+    return {
+      value: null,
+      status: "INVALID",
+      isOutOfRange: false,
+      notice: null,
+      warning: "Pilih kelas situs yang valid (SA–SF).",
+      source: "manual",
+    };
+  }
+
+  if (s1 === null || !Number.isFinite(s1) || s1 < 0) {
+    return {
+      value: null,
+      status: "INVALID",
+      isOutOfRange: false,
+      notice: null,
+      warning: "Nilai S1 harus berupa angka nol atau lebih.",
+      source: "manual",
+    };
+  }
+
+  const row = TABLE_7_FV.table[siteClass as keyof typeof TABLE_7_FV.table] as readonly number[];
+  const keys = TABLE_7_FV.s1_keys;
+
+  if (s1 <= keys[0]) {
+    const isUnder = s1 < keys[0];
+    return {
+      value: row[0],
+      status: "AUTOMATIC",
+      isOutOfRange: isUnder,
+      notice: isUnder ? `Nilai S1 (${s1} g) berada di bawah batas Tabel 7 (${keys[0]} g); menggunakan nilai batas kolom pertama (${row[0]}).` : null,
+      warning: null,
+      source: "otomatis SNI",
+    };
+  }
+
+  const lastIndex = keys.length - 1;
+  if (s1 >= keys[lastIndex]) {
+    const isOver = s1 > keys[lastIndex];
+    return {
+      value: row[lastIndex],
+      status: "AUTOMATIC",
+      isOutOfRange: isOver,
+      notice: isOver ? `Nilai S1 (${s1} g) berada di atas batas Tabel 7 (${keys[lastIndex]} g); menggunakan nilai batas kolom akhir (${row[lastIndex]}).` : null,
+      warning: null,
+      source: "otomatis SNI",
+    };
+  }
+
+  for (let i = 0; i < lastIndex; i++) {
+    const x0 = keys[i];
+    const x1 = keys[i + 1];
+    if (s1 >= x0 && s1 <= x1) {
+      const y0 = row[i];
+      const y1 = row[i + 1];
+      const interpolated = y0 + ((s1 - x0) / (x1 - x0)) * (y1 - y0);
+      return {
+        value: Math.round(interpolated * 10000) / 10000,
+        status: "AUTOMATIC",
+        isOutOfRange: false,
+        notice: null,
+        warning: null,
+        source: "otomatis SNI",
+      };
+    }
+  }
+
+  return {
+    value: null,
+    status: "INVALID",
+    isOutOfRange: false,
+    notice: null,
+    warning: "Gagal menginterpolasi nilai Fv.",
+    source: "manual",
+  };
+}
+
+export function getCoefficientSourceLabel(provenanceSource?: string): "otomatis SNI" | "manual" {
+  if (!provenanceSource) return "manual";
+  return provenanceSource.trim().toLowerCase().startsWith("otomatis") ? "otomatis SNI" : "manual";
+}
+
+export function syncSiteCoefficients(model: SeismicModel): SeismicModel {
+  if (model.raw_inputs.override_site_coefficients || model.raw_inputs.site_class === "SF") {
+    return model;
+  }
+  const faRes = calculateFa(model.raw_inputs.site_class, model.raw_inputs.ss);
+  const fvRes = calculateFv(model.raw_inputs.site_class, model.raw_inputs.s1);
+  const nextRaw = { ...model.raw_inputs };
+  const nextProv = { ...model.input_provenance };
+
+  if (faRes.value !== null) {
+    nextRaw.fa = faRes.value;
+    nextProv.fa = {
+      ...nextProv.fa,
+      source: "otomatis SNI",
+      entered_by: "SNI 1726:2019 Tabel 6",
+    };
+  }
+
+  if (fvRes.value !== null) {
+    nextRaw.fv = fvRes.value;
+    nextProv.fv = {
+      ...nextProv.fv,
+      source: "otomatis SNI",
+      entered_by: "SNI 1726:2019 Tabel 7",
+    };
+  }
+
+  return {
+    ...model,
+    raw_inputs: nextRaw,
+    input_provenance: nextProv,
+  };
+}
+
 export function createDefaultSeismic(revisionId: string, registryVersion: string): SeismicModel {
   return {
     revision_id: revisionId,
     registry_version: registryVersion,
-    raw_inputs: { ss: null, s1: null, tl: null, fa: null, fv: null, site_class: "", risk_category: "" },
+    raw_inputs: { ss: null, s1: null, tl: null, fa: null, fv: null, site_class: "", risk_category: "", override_site_coefficients: false },
     input_provenance: defaultProvenance(revisionId),
     engineering_options: defaultEngineeringOptions(),
     display_options: { max_period: 6, step: 0.01 },
@@ -197,6 +469,14 @@ export function evaluateResponseSpectrum(period: number, model: SeismicModel, co
 }
 
 export function sameSeismic(left: SeismicModel, right: SeismicModel) {
-  const clean = (model: SeismicModel) => ({ ...model, revision_id: "", input_provenance: Object.fromEntries(inputKeys.map((key) => [key, { ...model.input_provenance[key], project_revision: "" }])) });
+  const clean = (model: SeismicModel) => ({
+    ...model,
+    revision_id: "",
+    raw_inputs: {
+      ...model.raw_inputs,
+      override_site_coefficients: Boolean(model.raw_inputs.override_site_coefficients),
+    },
+    input_provenance: Object.fromEntries(inputKeys.map((key) => [key, { ...model.input_provenance[key], project_revision: "" }])),
+  });
   return JSON.stringify(clean(left)) === JSON.stringify(clean(right));
 }
