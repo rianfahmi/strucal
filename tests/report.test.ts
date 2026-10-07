@@ -8,6 +8,9 @@ import { generateReportDocx } from "../src/lib/report-docx.ts";
 import { REPORT_MASTER_FILE, REPORT_MASTER_SHA256, REPORT_TEMPLATE_MANIFEST } from "../src/lib/report-template-manifest.ts";
 import { createReportSnapshot, createReportWorkspace, deriveAssumptionsAndDefaults, isReportSnapshotStale, updateFigure, updateTableCaption, validateReport } from "../src/lib/report.ts";
 import { reviseGeometry } from "../src/lib/projects.ts";
+import { calculateSeismic, normalizeSeismic, seismicContext } from "../src/lib/seismic.ts";
+import { calculateSeismicWeight } from "../src/lib/loads.ts";
+import { getSeismicRegistry } from "../src/lib/seismic-registry.ts";
 import { completeProjectBundle } from "./fixtures/complete-project.ts";
 
 const decoder = new TextDecoder();
@@ -67,6 +70,25 @@ test("snapshot mem-pin revisi dan menjadi stale setelah perubahan upstream", () 
   assert.equal(isReportSnapshotStale(snapshot, bundle), false);
   const changed = reviseGeometry(bundle, { ...bundle.geometry, grid_x: bundle.geometry.grid_x.map((line, index) => index === 1 ? { ...line, ordinate: 7 } : line) }, "manual", () => "revision-2");
   assert.equal(isReportSnapshotStale(snapshot, changed), true);
+});
+
+test("payload seismik lama tetap dimuat, menghasilkan M6 identik, dan snapshot tidak stale", () => {
+  const { bundle, snapshot } = createSnapshot();
+  // Skema sebelum input-minimum: tujuh raw input dan provenance INPUT/PUSKIM.
+  const stored = JSON.parse(JSON.stringify({ bundle, snapshot })) as { bundle: typeof bundle; snapshot: typeof snapshot };
+  assert.deepEqual(Object.keys(stored.bundle.seismic.raw_inputs).sort(), ["fa", "fv", "risk_category", "s1", "site_class", "ss", "tl"].sort());
+  assert.deepEqual(Object.keys(stored.bundle.seismic.input_provenance.fa).sort(), ["source", "entered_by", "status", "project_revision"].sort());
+  // Normalisasi yang dipakai getProjectBundle setelah membaca penyimpanan.
+  const reloaded = { ...stored.bundle, seismic: normalizeSeismic(stored.bundle.seismic, stored.bundle.revision.id, stored.bundle.revision.registry_version) };
+  assert.equal(reloaded.seismic.raw_inputs.override_site_coefficients, false);
+  assert.deepEqual(reloaded.seismic.input_provenance, bundle.seismic.input_provenance);
+  const recomputed = calculateSeismic(
+    reloaded.seismic,
+    seismicContext(reloaded.geometry.stories, calculateSeismicWeight(reloaded.loads, reloaded.geometry, reloaded.revision.registry_version), true, reloaded.revision.engine_version),
+    getSeismicRegistry(reloaded.revision.registry_version),
+  );
+  assert.deepEqual(recomputed, bundle.seismic.derived_results);
+  assert.equal(isReportSnapshotStale(stored.snapshot, reloaded), false);
 });
 
 test("caption gambar/tabel dan upload override bertahan saat reopen", () => {
