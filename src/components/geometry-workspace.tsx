@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import {
   GEOMETRY_TOLERANCE,
   GeometryValidationError,
+  generateUniformGeometry,
+  generateUniformGrid,
+  generateUniformStories,
   recalculateStories,
   replaceGridOrdinate,
   replaceGridSpacing,
@@ -35,8 +38,15 @@ function GeometryEditor({ initial, markUnsaved, saveGeometry, saveStatus }: {
   const [tab, setTab] = useState<EditorTab>("grid");
   const [modes, setModes] = useState<Record<Axis, GridMode>>({ X: "spacing", Y: "spacing" });
   const [inputError, setInputError] = useState("");
+  const [genSpansX, setGenSpansX] = useState(4);
+  const [genSpacingX, setGenSpacingX] = useState(6);
+  const [genSpansY, setGenSpansY] = useState(3);
+  const [genSpacingY, setGenSpacingY] = useState(5);
+  const [genStoryCount, setGenStoryCount] = useState(5);
+  const [genTypicalHeight, setGenTypicalHeight] = useState(3.5);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const issues = validateGeometry(geometry);
+
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -104,6 +114,50 @@ function GeometryEditor({ initial, markUnsaved, saveGeometry, saveStatus }: {
     apply({ ...geometry, stories: recalculateStories(stories) });
   }
 
+  function applyUniformGridX() {
+    try {
+      const grid_x = generateUniformGrid("X", genSpansX, genSpacingX);
+      apply({ ...geometry, grid_x });
+    } catch (error) {
+      setInputError(error instanceof GeometryValidationError ? error.message : "Generator grid X gagal.");
+    }
+  }
+
+  function applyUniformGridY() {
+    try {
+      const grid_y = generateUniformGrid("Y", genSpansY, genSpacingY);
+      apply({ ...geometry, grid_y });
+    } catch (error) {
+      setInputError(error instanceof GeometryValidationError ? error.message : "Generator grid Y gagal.");
+    }
+  }
+
+  function applyUniformStories() {
+    try {
+      const stories = generateUniformStories(genStoryCount, genTypicalHeight, geometry.stories[0]?.elevation ?? 0);
+      apply({ ...geometry, stories });
+    } catch (error) {
+      setInputError(error instanceof GeometryValidationError ? error.message : "Generator story gagal.");
+    }
+  }
+
+  function applyAllUniformGeometry() {
+    try {
+      const next = generateUniformGeometry({
+        spansX: genSpansX,
+        spacingX: genSpacingX,
+        spansY: genSpansY,
+        spacingY: genSpacingY,
+        storyCount: genStoryCount,
+        typicalHeight: genTypicalHeight,
+        groundElevation: geometry.stories[0]?.elevation ?? 0,
+      }, geometry.revision_id);
+      apply(next);
+    } catch (error) {
+      setInputError(error instanceof GeometryValidationError ? error.message : "Generator geometri gagal.");
+    }
+  }
+
   async function saveNow() {
     clearTimeout(timer.current);
     if (issues.length) {
@@ -116,10 +170,64 @@ function GeometryEditor({ initial, markUnsaved, saveGeometry, saveStatus }: {
   return (
     <div className="geometry-workspace">
       <section className="panel geometry-editor" aria-label="Editor geometri">
+        <div className="geometry-generator" aria-label="Generator bentang dan tingkat seragam">
+          <div className="data-section-heading">
+            <div>
+              <p className="eyebrow">Shortcut Geometri</p>
+              <h3>Generator Bentang &amp; Tingkat Seragam</h3>
+            </div>
+            <span className="badge badge-neutral">Opsional</span>
+          </div>
+          <p className="field-note">
+            Bangkitkan denah kisi dan elevasi bertingkat seragam dengan cepat. Nilai per bentang atau per lantai tetap dapat disesuaikan pada tabel di bawah.
+          </p>
+          <div className="generator-row">
+            <label>
+              <span>Bentang X (jumlah)</span>
+              <input aria-label="Jumlah bentang X" type="number" min="1" step="1" value={genSpansX} onChange={(e) => setGenSpansX(Math.max(1, parseInt(e.target.value) || 1))} />
+            </label>
+            <label>
+              <span>Jarak X (m)</span>
+              <input aria-label="Jarak bentang X" type="number" min="0.1" step="any" value={genSpacingX} onChange={(e) => setGenSpacingX(parseFloat(e.target.value) || 0)} />
+            </label>
+            <label>
+              <span>Bentang Y (jumlah)</span>
+              <input aria-label="Jumlah bentang Y" type="number" min="1" step="1" value={genSpansY} onChange={(e) => setGenSpansY(Math.max(1, parseInt(e.target.value) || 1))} />
+            </label>
+            <label>
+              <span>Jarak Y (m)</span>
+              <input aria-label="Jarak bentang Y" type="number" min="0.1" step="any" value={genSpacingY} onChange={(e) => setGenSpacingY(parseFloat(e.target.value) || 0)} />
+            </label>
+            <label>
+              <span>Jumlah Lantai</span>
+              <input aria-label="Jumlah lantai" type="number" min="1" step="1" value={genStoryCount} onChange={(e) => setGenStoryCount(Math.max(1, parseInt(e.target.value) || 1))} />
+            </label>
+            <label>
+              <span>Tinggi Tipikal (m)</span>
+              <input aria-label="Tinggi lantai tipikal" type="number" min="0.1" step="any" value={genTypicalHeight} onChange={(e) => setGenTypicalHeight(parseFloat(e.target.value) || 0)} />
+            </label>
+          </div>
+          <div className="generator-actions">
+            <button type="button" className="button button-primary" onClick={applyAllUniformGeometry}>
+              Bentuk Seluruh Geometri Seragam
+            </button>
+            <button type="button" className="button button-secondary" onClick={applyUniformGridX}>
+              Terapkan Grid X
+            </button>
+            <button type="button" className="button button-secondary" onClick={applyUniformGridY}>
+              Terapkan Grid Y
+            </button>
+            <button type="button" className="button button-secondary" onClick={applyUniformStories}>
+              Terapkan Story
+            </button>
+          </div>
+        </div>
+
         <div className="geometry-tabs" role="tablist" aria-label="Data geometri">
           <button role="tab" aria-selected={tab === "grid"} className={tab === "grid" ? "active" : ""} type="button" onClick={() => setTab("grid")}>Grid System</button>
           <button role="tab" aria-selected={tab === "story"} className={tab === "story" ? "active" : ""} type="button" onClick={() => setTab("story")}>Story Data</button>
         </div>
+
 
         {tab === "grid" ? <div className="axis-stack">
           {(["X", "Y"] as const).map((axis) => {

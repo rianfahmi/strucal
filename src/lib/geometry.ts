@@ -117,6 +117,77 @@ export function sameGeometry(left: Geometry, right: Geometry) {
   return JSON.stringify({ ...left, revision_id: "" }) === JSON.stringify({ ...right, revision_id: "" });
 }
 
+export function gridLabelForIndex(axis: Axis, index: number): string {
+  if (axis === "Y") return String(index + 1);
+  let label = "";
+  let n = index;
+  while (n >= 0) {
+    label = String.fromCharCode(65 + (n % 26)) + label;
+    n = Math.floor(n / 26) - 1;
+  }
+  return label;
+}
+
+export function generateUniformGrid(axis: Axis, spanCount: number, spacing: number, origin = 0): GridLine[] {
+  if (!Number.isFinite(spanCount) || spanCount < 1) {
+    throw new GeometryValidationError("Jumlah bentang harus minimal 1.");
+  }
+  if (!Number.isFinite(spacing) || spacing <= GEOMETRY_TOLERANCE) {
+    throw new GeometryValidationError("Jarak bentang harus lebih besar dari nol.");
+  }
+  const lineCount = Math.floor(spanCount) + 1;
+  const spacings = Array(lineCount - 1).fill(spacing);
+  const ordinates = ordinatesFromSpacings(spacings, origin);
+  return ordinates.map((ordinate, index) => ({
+    axis,
+    label: gridLabelForIndex(axis, index),
+    ordinate,
+  }));
+}
+
+export function generateUniformStories(storyCount: number, typicalHeight: number, groundElevation = 0): Story[] {
+  if (!Number.isFinite(storyCount) || storyCount < 1) {
+    throw new GeometryValidationError("Jumlah lantai harus minimal 1.");
+  }
+  if (!Number.isFinite(typicalHeight) || typicalHeight <= GEOMETRY_TOLERANCE) {
+    throw new GeometryValidationError("Tinggi lantai harus lebih besar dari nol.");
+  }
+  const count = Math.floor(storyCount);
+  const rawStories: Story[] = [
+    { name: "Ground", order: 0, height: 0, elevation: groundElevation },
+  ];
+  for (let i = 1; i <= count; i++) {
+    const isTop = i === count;
+    const name = isTop ? "Roof" : `Story ${i}`;
+    rawStories.push({
+      name,
+      order: i,
+      height: typicalHeight,
+      elevation: 0,
+    });
+  }
+  return recalculateStories(rawStories);
+}
+
+export type UniformGeometryParams = {
+  spansX: number;
+  spacingX: number;
+  spansY: number;
+  spacingY: number;
+  storyCount: number;
+  typicalHeight: number;
+  groundElevation?: number;
+};
+
+export function generateUniformGeometry(params: UniformGeometryParams, revisionId: string): Geometry {
+  return {
+    revision_id: revisionId,
+    grid_x: generateUniformGrid("X", params.spansX, params.spacingX),
+    grid_y: generateUniformGrid("Y", params.spansY, params.spacingY),
+    stories: generateUniformStories(params.storyCount, params.typicalHeight, params.groundElevation ?? 0),
+  };
+}
+
 export function createDefaultGeometry(revisionId: string): Geometry {
   const grid = (axis: Axis, labels: string[], spacing: number): GridLine[] => labels.map((label, index) => ({ axis, label, ordinate: index * spacing }));
   return {
@@ -131,3 +202,4 @@ export function createDefaultGeometry(revisionId: string): Geometry {
     ]),
   };
 }
+

@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { getCombinationRegistry } from "../lib/load-registry";
 import {
   LOAD_CATEGORY_LABELS,
+  OCCUPANCY_PRESETS,
+  applyOccupancyPreset,
   calculateSeismicWeight,
   changeLoadApplication,
+  generateDefaultAssignments,
   loadTargets,
   validateLoads,
   type LoadApplication,
@@ -13,6 +16,7 @@ import {
   type LoadCategory,
   type LoadDefinition,
   type Loads,
+  type OccupancyType,
 } from "../lib/loads";
 import { useProjects, type SaveStatus } from "./project-provider";
 
@@ -39,6 +43,9 @@ function LoadEditor({ initial, geometry, registryVersion, markUnsaved, saveLoads
 }) {
   const [loads, setLoads] = useState(initial);
   const [tab, setTab] = useState<LoadTab>("definitions");
+  const [selectedOccupancy, setSelectedOccupancy] = useState<OccupancyType>("OFFICE");
+  const [applyTypical, setApplyTypical] = useState(true);
+  const [applyRoof, setApplyRoof] = useState(true);
   const [assignmentLoadId, setAssignmentLoadId] = useState(initial.definitions[0]?.id ?? "");
   const [assignmentTargetId, setAssignmentTargetId] = useState("");
   const [assignmentAssumption, setAssignmentAssumption] = useState("");
@@ -47,6 +54,7 @@ function LoadEditor({ initial, geometry, registryVersion, markUnsaved, saveLoads
   const targets = loadTargets(geometry);
   const issues = validateLoads(loads, geometry);
   const seismicWeight = calculateSeismicWeight(loads, geometry, registryVersion);
+
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -82,6 +90,19 @@ function LoadEditor({ initial, geometry, registryVersion, markUnsaved, saveLoads
     setAssignmentAssumption("");
   }
 
+  function handleApplyPreset() {
+    const next = applyOccupancyPreset(loads, selectedOccupancy);
+    apply(next);
+  }
+
+  function handleSmartAssignment() {
+    const nextAssignments = generateDefaultAssignments(loads, geometry, {
+      includeTypicalFloors: applyTypical,
+      includeRoof: applyRoof,
+    });
+    apply({ ...loads, assignments: nextAssignments });
+  }
+
   async function saveNow() {
     clearTimeout(timer.current);
     if (!issues.length) await saveLoads(loads, "manual");
@@ -97,6 +118,40 @@ function LoadEditor({ initial, geometry, registryVersion, markUnsaved, saveLoads
 
     {tab === "definitions" && <section aria-labelledby="load-definitions-title">
       <LoadHeading id="load-definitions-title" eyebrow="Data proyek" title="Load Definitions" badge="INPUT" />
+
+      <div className="load-preset-box" aria-label="Preset fungsi bangunan">
+        <div className="load-preset-header">
+          <div>
+            <p className="eyebrow">Preset Standar Pembebanan (SNI 1727:2020 &amp; SNI 1726:2019)</p>
+            <h3>Fungsi Bangunan</h3>
+          </div>
+          <span className="load-preset-badge">Dapat diubah bebas (User-editable)</span>
+        </div>
+        <p className="field-note">
+          Pilih fungsi bangunan untuk mengisi otomatis nilai beban hidup, finishing/partisi (SIDL), beban sendiri, dan faktor berat seismik W sesuai SNI. Semua nilai pada tabel di bawah tetap dapat diedit manual.
+        </p>
+        <div className="load-preset-controls">
+          <label>
+            <span>Fungsi Ruang / Bangunan</span>
+            <select aria-label="Pilih fungsi bangunan" value={selectedOccupancy} onChange={(e) => setSelectedOccupancy(e.target.value as OccupancyType)}>
+              {Object.values(OCCUPANCY_PRESETS).map((preset) => (
+                <option key={preset.key} value={preset.key}>
+                  {preset.label} — {preset.description}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="button button-secondary" onClick={handleApplyPreset}>
+            Terapkan Preset Beban
+          </button>
+        </div>
+        <div className="preset-reference-summary">
+          <small>
+            Rujukan SNI: Live {OCCUPANCY_PRESETS[selectedOccupancy].loads.live.value} kN/m² ({OCCUPANCY_PRESETS[selectedOccupancy].loads.live.source}) · SIDL {OCCUPANCY_PRESETS[selectedOccupancy].loads.superimposed_dead.value} kN/m² ({OCCUPANCY_PRESETS[selectedOccupancy].loads.superimposed_dead.source})
+          </small>
+        </div>
+      </div>
+
       <div className="table-scroll"><table className="load-table load-definition-table"><thead><tr><th>Nama / kategori</th><th>Nilai</th><th>Aplikasi</th><th>Faktor W</th><th>Sumber</th><th>Asumsi</th><th>Provenance</th><th><span className="sr-only">Aksi</span></th></tr></thead><tbody>
         {loads.definitions.map((definition, index) => <tr key={definition.id}>
           <td><input aria-label={`Nama load ${index + 1}`} value={definition.name} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, name: event.target.value }))} /><select aria-label={`Kategori load ${index + 1}`} value={definition.category} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, category: event.target.value as LoadCategory }))}>{Object.entries(LOAD_CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td>
@@ -114,6 +169,35 @@ function LoadEditor({ initial, geometry, registryVersion, markUnsaved, saveLoads
 
     {tab === "assignments" && <section aria-labelledby="load-assignments-title">
       <LoadHeading id="load-assignments-title" eyebrow="Target geometri aktif" title="Load Assignments" badge="INPUT" />
+
+      <div className="assignment-smart-box" aria-label="Penugasan beban tipikal otomatis">
+        <div className="load-preset-header">
+          <div>
+            <p className="eyebrow">Penugasan Cerdas (Smart Typical Assignment)</p>
+            <h3>Terapkan Beban ke Geometri Aktif</h3>
+          </div>
+          <span className="badge badge-neutral">Shortcut</span>
+        </div>
+        <p className="field-note">
+          Menugaskan beban area (Dead, SIDL, Live) ke seluruh lantai tipikal dan (Dead, SIDL, Roof Live, Rain) ke lantai atap dengan teks asumsi otomatis tanpa input berulang.
+        </p>
+        <div className="checkbox-group">
+          <label className="override-checkbox">
+            <input type="checkbox" checked={applyTypical} onChange={(e) => setApplyTypical(e.target.checked)} />
+            Terapkan ke seluruh lantai tipikal ({geometry.stories.filter((s) => s.order > 0 && s.order < geometry.stories.length - 1).map((s) => s.name).join(", ") || "Story 1..N-1"})
+          </label>
+          <label className="override-checkbox">
+            <input type="checkbox" checked={applyRoof} onChange={(e) => setApplyRoof(e.target.checked)} />
+            Terapkan ke lantai atap ({geometry.stories.at(-1)?.name ?? "Roof"})
+          </label>
+        </div>
+        <div>
+          <button type="button" className="button button-primary" onClick={handleSmartAssignment}>
+            Terapkan Penugasan Otomatis
+          </button>
+        </div>
+      </div>
+
       <div className="assignment-form">
         <label><span>Load definition</span><select value={assignmentLoadId} onChange={(event) => { setAssignmentLoadId(event.target.value); setAssignmentTargetId(""); }}>{loads.definitions.map((definition) => <option key={definition.id} value={definition.id}>{definition.name} · {definition.unit}</option>)}</select></label>
         <label><span>Target / application</span><select value={assignmentTargetId} onChange={(event) => setAssignmentTargetId(event.target.value)}><option value="">Pilih target aktual</option>{compatibleTargets.map((target) => <option key={target.id} value={target.id}>{target.label} · {target.measure} {target.measure_unit}</option>)}</select></label>
@@ -122,6 +206,7 @@ function LoadEditor({ initial, geometry, registryVersion, markUnsaved, saveLoads
       </div>
       <AssignmentTable assignments={loads.assignments} definitions={loads.definitions} targets={targets} onDelete={(id) => apply({ ...loads, assignments: loads.assignments.filter((assignment) => assignment.id !== id) })} />
     </section>}
+
 
     {tab === "gravity" && <LoadReview title="Gravity Loads" definitions={loads.definitions.filter(({ category }) => gravityCategories.has(category))} assignments={loads.assignments} />}
     {tab === "weather" && <LoadReview title="Wind / Rain" definitions={loads.definitions.filter(({ category }) => category === "WIND" || category === "RAIN")} assignments={loads.assignments} />}

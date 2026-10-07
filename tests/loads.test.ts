@@ -3,9 +3,12 @@ import test from "node:test";
 import { createDefaultGeometry } from "../src/lib/geometry.ts";
 import { getCombinationRegistry } from "../src/lib/load-registry.ts";
 import {
+  applyDefaultLoadsWorkflow,
+  applyOccupancyPreset,
   calculateSeismicWeight,
   changeLoadApplication,
   createDefaultLoads,
+  generateDefaultAssignments,
   loadTargets,
   validateLoads,
   type Loads,
@@ -83,3 +86,71 @@ test("registry kombinasi kosong tidak mengarang referensi proyek", () => {
   assert.equal(registry.status, "PENDING_ENGINEER_APPROVAL");
   assert.deepEqual(registry.rules, []);
 });
+
+test("preset occupancy mengisi beban SNI 1727:2020 dan faktor W SNI 1726:2019 secara lengkap", () => {
+  const initial = createDefaultLoads("rev-1", registryVersion);
+  const officeLoads = applyOccupancyPreset(initial, "OFFICE");
+  const liveDef = officeLoads.definitions.find((d) => d.category === "LIVE")!;
+  const sidlDef = officeLoads.definitions.find((d) => d.category === "SUPERIMPOSED_DEAD")!;
+  const swDef = officeLoads.definitions.find((d) => d.category === "SELF_WEIGHT")!;
+
+  assert.equal(liveDef.value, 2.4);
+  assert.equal(liveDef.seismic_weight_factor, 0);
+  assert.ok(liveDef.source.includes("SNI 1727:2020"));
+  assert.ok(liveDef.source.includes("hlm. 26"));
+  assert.ok(liveDef.source.includes("PDF hlm. 58"));
+
+  assert.equal(sidlDef.value, 1.5);
+  assert.equal(sidlDef.seismic_weight_factor, 1.0);
+  assert.ok(sidlDef.source.includes("SNI 1727:2020"));
+
+  assert.equal(swDef.value, 2.88);
+  assert.equal(swDef.seismic_weight_factor, 1.0);
+
+  const resLoads = applyOccupancyPreset(initial, "RESIDENTIAL");
+  assert.equal(resLoads.definitions.find((d) => d.category === "LIVE")?.value, 1.92);
+
+  const schoolLoads = applyOccupancyPreset(initial, "SCHOOL");
+  assert.equal(schoolLoads.definitions.find((d) => d.category === "LIVE")?.value, 1.92);
+
+  const hospLoads = applyOccupancyPreset(initial, "HOSPITAL");
+  assert.equal(hospLoads.definitions.find((d) => d.category === "LIVE")?.value, 1.92);
+});
+
+test("generateDefaultAssignments menugaskan beban lantai tipikal dan atap dengan asumsi non-kosong", () => {
+  const geometry = createDefaultGeometry("rev-1");
+  const initial = createDefaultLoads("rev-1", registryVersion);
+  const officeLoads = applyOccupancyPreset(initial, "OFFICE");
+
+  const assignments = generateDefaultAssignments(officeLoads, geometry);
+  assert.equal(assignments.length, 10);
+  assert.ok(assignments.every((a) => a.assumption.length > 0));
+  assert.ok(assignments.every((a) => a.target_type === "STORY_AREA"));
+
+  const loadsWithAssignments = { ...officeLoads, assignments };
+  const doubleRun = generateDefaultAssignments(loadsWithAssignments, geometry);
+  assert.equal(doubleRun.length, 10);
+
+  const issues = validateLoads(loadsWithAssignments, geometry);
+  assert.deepEqual(issues, []);
+});
+
+test("workflow beban minimum menghasilkan berat seismik W yang valid tanpa input berulang", () => {
+  const geometry = createDefaultGeometry("rev-1");
+  const initial = createDefaultLoads("rev-1", registryVersion);
+  const configured = applyDefaultLoadsWorkflow(initial, geometry, "OFFICE");
+
+  assert.deepEqual(validateLoads(configured, geometry), []);
+
+  const result = calculateSeismicWeight(configured, geometry, registryVersion);
+  assert.equal(result.status, "AVAILABLE");
+  assert.ok(result.value > 0);
+  assert.equal(result.warnings.length, 0);
+
+  const overridden = {
+    ...configured,
+    definitions: configured.definitions.map((d) => d.category === "LIVE" ? { ...d, value: 3.0 } : d),
+  };
+  assert.deepEqual(validateLoads(overridden, geometry), []);
+});
+

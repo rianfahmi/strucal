@@ -204,3 +204,309 @@ export function sameLoads(left: Loads, right: Loads) {
   });
   return JSON.stringify(withoutRevision(left)) === JSON.stringify(withoutRevision(right));
 }
+
+export type OccupancyType = "OFFICE" | "RESIDENTIAL" | "SCHOOL" | "HOSPITAL";
+
+export type OccupancyPreset = {
+  key: OccupancyType;
+  label: string;
+  description: string;
+  loads: {
+    self_weight: { value: number; source: string; assumption: string; seismic_factor: number };
+    superimposed_dead: { value: number; source: string; assumption: string; seismic_factor: number };
+    live: { value: number; source: string; assumption: string; seismic_factor: number };
+    roof_live: { value: number; source: string; assumption: string; seismic_factor: number };
+    wind: { value: number; source: string; assumption: string; seismic_factor: number };
+    rain: { value: number; source: string; assumption: string; seismic_factor: number };
+  };
+};
+
+export const OCCUPANCY_PRESETS: Record<OccupancyType, OccupancyPreset> = {
+  OFFICE: {
+    key: "OFFICE",
+    label: "Gedung Kantor",
+    description: "Ruang kantor umum, koridor, dan partisi fleksibel",
+    loads: {
+      self_weight: {
+        value: 2.88,
+        source: "SNI 1727:2020 Tabel C3.1-2 hlm. 282 (PDF hlm. 314)",
+        assumption: "Pelat beton bertulang tebal 120 mm (24 kN/m³)",
+        seismic_factor: 1.0,
+      },
+      superimposed_dead: {
+        value: 1.50,
+        source: "SNI 1727:2020 Tabel C3.1-2 hlm. 282 (PDF hlm. 314) & Pasal 4.3.2",
+        assumption: "Finishing spesi keramik, plafon, MEP, dan partisi kantor (0,72 kN/m²)",
+        seismic_factor: 1.0,
+      },
+      live: {
+        value: 2.40,
+        source: "SNI 1727:2020 Tabel 4.3-1 hlm. 26 (PDF hlm. 58)",
+        assumption: "Beban hidup ruang kantor (2,40 kN/m² / 50 psf)",
+        seismic_factor: 0.0,
+      },
+      roof_live: {
+        value: 0.96,
+        source: "SNI 1727:2020 Tabel 4.3-1 hlm. 29 (PDF hlm. 61)",
+        assumption: "Atap datar dengan akses pemeliharaan (0,96 kN/m² / 20 psf)",
+        seismic_factor: 0.0,
+      },
+      wind: {
+        value: 0.40,
+        source: "SNI 1727:2020 Bab 26–31 hlm. 129 (PDF hlm. 161)",
+        assumption: "Beban angin desain minimum dinding penahan",
+        seismic_factor: 0.0,
+      },
+      rain: {
+        value: 0.20,
+        source: "SNI 1727:2020 Bab 8 hlm. 67 (PDF hlm. 99)",
+        assumption: "Beban air hujan desain atap datar",
+        seismic_factor: 0.0,
+      },
+    },
+  },
+  RESIDENTIAL: {
+    key: "RESIDENTIAL",
+    label: "Hunian / Rumah Tinggal / Apartemen",
+    description: "Kamar hunian dan ruang tinggal privat",
+    loads: {
+      self_weight: {
+        value: 2.88,
+        source: "SNI 1727:2020 Tabel C3.1-2 hlm. 282 (PDF hlm. 314)",
+        assumption: "Pelat beton bertulang tebal 120 mm (24 kN/m³)",
+        seismic_factor: 1.0,
+      },
+      superimposed_dead: {
+        value: 1.20,
+        source: "SNI 1727:2020 Tabel C3.1-2 hlm. 282 (PDF hlm. 314)",
+        assumption: "Finishing spesi keramik dan plafon hunian",
+        seismic_factor: 1.0,
+      },
+      live: {
+        value: 1.92,
+        source: "SNI 1727:2020 Tabel 4.3-1 hlm. 26 (PDF hlm. 58)",
+        assumption: "Beban hidup ruang hunian privat (1,92 kN/m² / 40 psf)",
+        seismic_factor: 0.0,
+      },
+      roof_live: {
+        value: 0.96,
+        source: "SNI 1727:2020 Tabel 4.3-1 hlm. 29 (PDF hlm. 61)",
+        assumption: "Atap datar dengan akses pemeliharaan (0,96 kN/m² / 20 psf)",
+        seismic_factor: 0.0,
+      },
+      wind: {
+        value: 0.40,
+        source: "SNI 1727:2020 Bab 26–31 hlm. 129 (PDF hlm. 161)",
+        assumption: "Beban angin desain minimum",
+        seismic_factor: 0.0,
+      },
+      rain: {
+        value: 0.20,
+        source: "SNI 1727:2020 Bab 8 hlm. 67 (PDF hlm. 99)",
+        assumption: "Beban air hujan desain atap",
+        seismic_factor: 0.0,
+      },
+    },
+  },
+  SCHOOL: {
+    key: "SCHOOL",
+    label: "Sekolah / Ruang Kelas",
+    description: "Ruang kelas dan fasilitas pendidikan",
+    loads: {
+      self_weight: {
+        value: 2.88,
+        source: "SNI 1727:2020 Tabel C3.1-2 hlm. 282 (PDF hlm. 314)",
+        assumption: "Pelat beton bertulang tebal 120 mm (24 kN/m³)",
+        seismic_factor: 1.0,
+      },
+      superimposed_dead: {
+        value: 1.30,
+        source: "SNI 1727:2020 Tabel C3.1-2 hlm. 282 (PDF hlm. 314)",
+        assumption: "Finishing spesi keramik, instalasi pendidikan, dan plafon",
+        seismic_factor: 1.0,
+      },
+      live: {
+        value: 1.92,
+        source: "SNI 1727:2020 Tabel 4.3-1 hlm. 26 (PDF hlm. 58)",
+        assumption: "Beban hidup ruang kelas sekolah (1,92 kN/m² / 40 psf)",
+        seismic_factor: 0.0,
+      },
+      roof_live: {
+        value: 0.96,
+        source: "SNI 1727:2020 Tabel 4.3-1 hlm. 29 (PDF hlm. 61)",
+        assumption: "Atap datar dengan akses pemeliharaan (0,96 kN/m² / 20 psf)",
+        seismic_factor: 0.0,
+      },
+      wind: {
+        value: 0.40,
+        source: "SNI 1727:2020 Bab 26–31 hlm. 129 (PDF hlm. 161)",
+        assumption: "Beban angin desain minimum",
+        seismic_factor: 0.0,
+      },
+      rain: {
+        value: 0.20,
+        source: "SNI 1727:2020 Bab 8 hlm. 67 (PDF hlm. 99)",
+        assumption: "Beban air hujan desain atap",
+        seismic_factor: 0.0,
+      },
+    },
+  },
+  HOSPITAL: {
+    key: "HOSPITAL",
+    label: "Rumah Sakit / Ruang Pasien",
+    description: "Kamar rawat inap dan fasilitas kesehatan",
+    loads: {
+      self_weight: {
+        value: 2.88,
+        source: "SNI 1727:2020 Tabel C3.1-2 hlm. 282 (PDF hlm. 314)",
+        assumption: "Pelat beton bertulang tebal 120 mm (24 kN/m³)",
+        seismic_factor: 1.0,
+      },
+      superimposed_dead: {
+        value: 1.50,
+        source: "SNI 1727:2020 Tabel C3.1-2 hlm. 282 (PDF hlm. 314)",
+        assumption: "Finishing lantai medis, MEP, dan partisi ruang pasien",
+        seismic_factor: 1.0,
+      },
+      live: {
+        value: 1.92,
+        source: "SNI 1727:2020 Tabel 4.3-1 hlm. 27 (PDF hlm. 59)",
+        assumption: "Beban hidup ruang rawat pasien (1,92 kN/m² / 40 psf)",
+        seismic_factor: 0.0,
+      },
+      roof_live: {
+        value: 0.96,
+        source: "SNI 1727:2020 Tabel 4.3-1 hlm. 29 (PDF hlm. 61)",
+        assumption: "Atap datar dengan akses pemeliharaan (0,96 kN/m² / 20 psf)",
+        seismic_factor: 0.0,
+      },
+      wind: {
+        value: 0.40,
+        source: "SNI 1727:2020 Bab 26–31 hlm. 129 (PDF hlm. 161)",
+        assumption: "Beban angin desain minimum",
+        seismic_factor: 0.0,
+      },
+      rain: {
+        value: 0.20,
+        source: "SNI 1727:2020 Bab 8 hlm. 67 (PDF hlm. 99)",
+        assumption: "Beban air hujan desain atap",
+        seismic_factor: 0.0,
+      },
+    },
+  },
+};
+
+export function applyOccupancyPreset(loads: Loads, presetKey: OccupancyType): Loads {
+  const preset = OCCUPANCY_PRESETS[presetKey];
+  if (!preset) return loads;
+
+  const keyMap: Record<LoadCategory, keyof OccupancyPreset["loads"] | undefined> = {
+    SELF_WEIGHT: "self_weight",
+    SUPERIMPOSED_DEAD: "superimposed_dead",
+    LIVE: "live",
+    ROOF_LIVE: "roof_live",
+    WIND: "wind",
+    RAIN: "rain",
+    SEISMIC: undefined,
+  };
+
+  const updatedDefinitions = loads.definitions.map((def) => {
+    const fieldKey = keyMap[def.category];
+    if (!fieldKey) return def;
+    const config = preset.loads[fieldKey];
+    return {
+      ...def,
+      value: config.value,
+      source: config.source,
+      assumption: config.assumption,
+      seismic_weight_factor: config.seismic_factor,
+    };
+  });
+
+  return {
+    ...loads,
+    definitions: updatedDefinitions,
+  };
+}
+
+export function generateDefaultAssignments(
+  loads: Loads,
+  geometry: Geometry,
+  options?: { includeTypicalFloors?: boolean; includeRoof?: boolean }
+): LoadAssignment[] {
+  const includeTypical = options?.includeTypicalFloors ?? true;
+  const includeRoof = options?.includeRoof ?? true;
+
+  const upperStories = geometry.stories.filter((s) => s.order > 0);
+  if (!upperStories.length) return loads.assignments;
+
+  const maxOrder = Math.max(...upperStories.map((s) => s.order));
+  const roofStory = upperStories.find((s) => s.order === maxOrder);
+  const typicalStories = upperStories.filter((s) => s.order < maxOrder);
+
+  const getDefId = (category: LoadCategory) => loads.definitions.find((d) => d.category === category)?.id;
+
+  const defSelfWeight = getDefId("SELF_WEIGHT");
+  const defSidl = getDefId("SUPERIMPOSED_DEAD");
+  const defLive = getDefId("LIVE");
+  const defRoofLive = getDefId("ROOF_LIVE");
+  const defRain = getDefId("RAIN");
+
+  const existingKeys = new Set(loads.assignments.map((a) => `${a.load_id}:${a.target_id}`));
+  const nextAssignments: LoadAssignment[] = [...loads.assignments];
+
+  const createId = () => typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `load-assign-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+  const addIfAbsent = (loadId: string | undefined, story: typeof upperStories[0], assumption: string) => {
+    if (!loadId) return;
+    const targetId = `story:${story.order}:area`;
+    const key = `${loadId}:${targetId}`;
+    if (!existingKeys.has(key)) {
+      existingKeys.add(key);
+      nextAssignments.push({
+        id: createId(),
+        load_id: loadId,
+        target_type: "STORY_AREA",
+        target_id: targetId,
+        application: "UNIFORM_AREA",
+        assumption,
+        revision_id: loads.revision_id,
+        provenance: "INPUT",
+      });
+    }
+  };
+
+  if (includeTypical) {
+    for (const story of typicalStories) {
+      addIfAbsent(defSelfWeight, story, `Beban sendiri lantai tipikal ${story.name} (SNI 1727:2020)`);
+      addIfAbsent(defSidl, story, `Beban mati tambahan lantai tipikal ${story.name} (SNI 1727:2020)`);
+      addIfAbsent(defLive, story, `Beban hidup lantai tipikal ${story.name} (SNI 1727:2020)`);
+    }
+  }
+
+  if (includeRoof && roofStory) {
+    addIfAbsent(defSelfWeight, roofStory, `Beban sendiri atap ${roofStory.name} (SNI 1727:2020)`);
+    addIfAbsent(defSidl, roofStory, `Beban mati tambahan atap ${roofStory.name} (SNI 1727:2020)`);
+    addIfAbsent(defRoofLive, roofStory, `Beban hidup atap ${roofStory.name} (SNI 1727:2020)`);
+    addIfAbsent(defRain, roofStory, `Beban air hujan atap ${roofStory.name} (SNI 1727:2020)`);
+  }
+
+  return nextAssignments;
+}
+
+export function applyDefaultLoadsWorkflow(
+  loads: Loads,
+  geometry: Geometry,
+  presetKey: OccupancyType = "OFFICE",
+  options?: { includeTypicalFloors?: boolean; includeRoof?: boolean }
+): Loads {
+  const withPresets = applyOccupancyPreset(loads, presetKey);
+  const assignments = generateDefaultAssignments(withPresets, geometry, options);
+  return {
+    ...withPresets,
+    assignments,
+  };
+}
+
