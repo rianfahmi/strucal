@@ -44,7 +44,7 @@ test("input engineer/PUSKIM wajib lengkap beserta provenance", () => {
   assert.equal(approvedModel().input_provenance.fa.status, "INPUT");
 });
 
-test("Fa/Fv adalah INPUT tanpa interpolasi dan parameter spektrum diturunkan otomatis", () => {
+test("Engine M6 memakai Fa/Fv tersimpan tanpa interpolasi ulang", () => {
   const result = calculateSeismic({ ...approvedModel(), selected_structural_system_id: null }, context, registry);
   assert.equal(result.coefficients?.fa.provenance, "INPUT");
   assert.equal(result.coefficients?.fv.formula_id, "INPUT.FV.M6.V1");

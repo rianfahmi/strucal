@@ -212,6 +212,12 @@ Preset ini disediakan sebagai nilai awal yang **dapat diubah bebas oleh pengguna
 
 ### 4.2 Spesifikasi Fitur Baru: Otomatisasi $F_a$ dan $F_v$ dengan Override Manual
 
+**Batas engine dan otomatisasi input**: Workspace menghitung Fa/Fv sebelum memasukkannya ke `raw_inputs`; override manual memasukkan nilai pengguna ke field yang sama. Engine `calculateSeismic` dan adapter registry approved M6 V1 memakai nilai tersimpan tersebut tanpa lookup atau interpolasi ulang. Kebijakan "input tanpa interpolasi" pada registry berlaku pada batas engine; otomatisasi workspace tidak mengubah rumus atau kebijakan registry itu.
+
+`input_provenance.fa.source` dan `input_provenance.fv.source` merekam asal nilai: penanda `otomatis SNI` menghasilkan label otomatis, sumber terisi lainnya (termasuk manual/PUSKIM) menghasilkan label manual. Sumber kosong atau hilang diberi label `Input manual (data lama, sumber tidak tercatat)`. Badge input dan blok Asumsi & Default pada UI, cetak, dan DOCX menggunakan helper label yang sama. Flag `override_site_coefficients` mengatur mode pengisian, bukan bukti asal nilai. Trace engine tetap berstatus `INPUT` karena koefisien diterima dari batas input.
+
+Test batas ini bernama "Engine M6 memakai Fa/Fv tersimpan tanpa interpolasi ulang" dan "Registry approved M6 V1 mempertahankan kebijakan input koefisien". Pengujian alur browser dicatat pada [MANUAL-TEST.md](MANUAL-TEST.md); kolom hasil dibiarkan kosong sampai uji dilakukan. Ekspor DOCX tetap mensyaratkan sumber wajib terisi; label data lama tidak menggantikan validasi kelengkapan provenance.
+
 #### A. Aturan Interpolasi dan Perlakuan Batas ($S_s$ dan $S_1$)
 Lookup nilai mengacu pada SNI 1726:2019 Pasal 6.2 (Tabel 6 untuk $F_a$ dan Tabel 7 untuk $F_v$).
 

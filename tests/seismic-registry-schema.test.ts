@@ -51,7 +51,7 @@ test("entry M6 approved dan klasifikasi tanah otomatis tetap future scope", () =
   assert.equal(registry.future_scope_review_items.length, 1);
 });
 
-test("Fa/Fv tetap memuat sumber tetapi M6 memakai input tanpa interpolasi", () => {
+test("Registry approved M6 V1 mempertahankan kebijakan input koefisien", () => {
   const fa = entry("seismic.site.fa");
   const fv = entry("seismic.site.fv");
   assert.deepEqual(fa.rule_data.axis_Ss_g.map((point: { value: number }) => point.value), [0.25, 0.5, 0.75, 1, 1.25, 1.5]);
