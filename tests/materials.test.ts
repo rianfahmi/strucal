@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createDefaultMaterials, validateMaterials, type Materials } from "../src/lib/materials.ts";
+import {
+  MAX_FYS_LIMIT,
+  applyConcretePreset,
+  applyCoverPreset,
+  applyRebarPreset,
+  applyStandardDiameters,
+  createDefaultMaterials,
+  validateMaterials,
+  type Materials,
+} from "../src/lib/materials.ts";
 import { createProjectBundle, reviseMaterials } from "../src/lib/projects.ts";
 
 function validMaterials(revisionId = "revision-1"): Materials {
@@ -74,4 +83,76 @@ test("penyimpanan material membuat revisi dan mempertahankan geometri", () => {
   assert.equal(saved.materials.concrete.fc.value, 30);
   assert.deepEqual(saved.geometry.grid_x, initial.geometry.grid_x);
   assert.throws(() => reviseMaterials(initial, createDefaultMaterials("revision-1"), "manual"), /Mutu beton wajib diisi/);
+});
+
+test("preset mutu beton mengisi fc', density, cover dengan benar dan mendukung override", () => {
+  const initial = createDefaultMaterials("rev-1");
+  const applied = applyConcretePreset(initial, "fc-25");
+
+  assert.equal(applied.concrete.grade, "fc' 25 MPa");
+  assert.equal(applied.concrete.fc.value, 25);
+  assert.equal(applied.concrete.density.value, 2400);
+  assert.equal(applied.concrete.cover.value, 40);
+
+  // Mekanisme override manual
+  const overridden = {
+    ...applied,
+    concrete: {
+      ...applied.concrete,
+      fc: { ...applied.concrete.fc, value: 27.5 },
+      cover: { ...applied.concrete.cover, value: 50 },
+    },
+  };
+  assert.equal(overridden.concrete.fc.value, 27.5);
+  assert.equal(overridden.concrete.cover.value, 50);
+});
+
+test("preset baja tulangan mengisi fy dan fys dengan default terikat dan batas 420 MPa", () => {
+  const initial = createDefaultMaterials("rev-1");
+  
+  // BjTS 420B
+  const m420 = applyRebarPreset(initial, "bjts-420b");
+  assert.equal(m420.longitudinal_rebar.grade, "BjTS 420B");
+  assert.equal(m420.longitudinal_rebar.fy.value, 420);
+  assert.equal(m420.transverse_rebar.fys.value, 420);
+
+  // BjTS 520 (fy=520, tetapi fys dibatasi ke 420 untuk sengkang sesuai SNI 2847)
+  const m520 = applyRebarPreset(initial, "bjts-520");
+  assert.equal(m520.longitudinal_rebar.fy.value, 520);
+  assert.equal(m520.transverse_rebar.fys.value, MAX_FYS_LIMIT);
+
+  // Override manual fys
+  const customTransverse = {
+    ...m420,
+    transverse_rebar: {
+      ...m420.transverse_rebar,
+      grade: "BjTP 280",
+      fys: { ...m420.transverse_rebar.fys, value: 280 },
+    },
+  };
+  assert.equal(customTransverse.transverse_rebar.fys.value, 280);
+});
+
+test("validasi menolak fys melebihi 420 MPa sesuai SNI 2847:2019 Tabel 20.2.2.4a", () => {
+  const materials = validMaterials();
+  materials.transverse_rebar.fys.value = 500;
+
+  const issues = validateMaterials(materials);
+  const fysIssue = issues.find(({ path }) => path === "transverse_rebar.fys");
+  assert.ok(fysIssue);
+  assert.match(fysIssue.message, /melebihi batas maksimum 420 MPa/);
+  assert.match(fysIssue.message, /SNI 2847:2019 Tabel 20.2.2.4a/);
+
+  // Batas tepat 420 MPa harus diterima
+  materials.transverse_rebar.fys.value = 420;
+  assert.equal(validateMaterials(materials).length, 0);
+});
+
+test("preset selimut dan diameter standar mengisi parameter dengan benar", () => {
+  const initial = createDefaultMaterials("rev-1");
+  const withCover = applyCoverPreset(initial, "earth-contact-permanent");
+  assert.equal(withCover.concrete.cover.value, 75);
+
+  const withDiameters = applyStandardDiameters(initial);
+  assert.deepEqual(withDiameters.available_diameters.map((d) => d.nominal_diameter.value), [10, 13, 16, 19, 22, 25]);
 });

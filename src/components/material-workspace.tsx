@@ -1,7 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { validateMaterials, type MaterialIssue, type Materials, type MaterialValue } from "../lib/materials";
+import {
+  CONCRETE_PRESETS,
+  COVER_PRESETS,
+  REBAR_PRESETS,
+  MAX_FYS_LIMIT,
+  applyConcretePreset,
+  applyCoverPreset,
+  applyRebarPreset,
+  applyStandardDiameters,
+  validateMaterials,
+  type MaterialIssue,
+  type Materials,
+  type MaterialValue,
+} from "../lib/materials";
 import { useProjects, type SaveStatus } from "./project-provider";
 
 type MaterialTab = "concrete" | "longitudinal" | "transverse" | "diameters";
@@ -53,11 +66,27 @@ function MaterialEditor({ initial, markUnsaved, saveMaterials, saveStatus }: {
 
       {tab === "concrete" && <section className="material-section" aria-labelledby="concrete-title">
         <SectionHeading eyebrow="Beton" title="Concrete" badge="INPUT" id="concrete-title" />
+        <div className="preset-selector">
+          <label><span>Pilihan Cepat Mutu Beton</span>
+            <select aria-label="Pilihan Cepat Mutu Beton" value={CONCRETE_PRESETS.find((p) => p.grade === materials.concrete.grade && p.fc === materials.concrete.fc.value)?.id ?? ""} onChange={(e) => e.target.value && apply(applyConcretePreset(materials, e.target.value))}>
+              <option value="">Pilih Preset Mutu (atau isi manual di bawah)</option>
+              {CONCRETE_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
+            </select>
+          </label>
+        </div>
         <div className="material-form">
           <TextField label="Mutu / grade" path="concrete.grade" value={materials.concrete.grade} issue={issueAt("concrete.grade")} onChange={(grade) => apply({ ...materials, concrete: { ...materials.concrete, grade } })} />
           <NumberField label="fc'" path="concrete.fc" quantity={materials.concrete.fc} issue={issueAt("concrete.fc")} onChange={(value) => apply({ ...materials, concrete: { ...materials.concrete, fc: { ...materials.concrete.fc, value } } })} />
           <NumberField label="Density" path="concrete.density" quantity={materials.concrete.density} issue={issueAt("concrete.density")} onChange={(value) => apply({ ...materials, concrete: { ...materials.concrete, density: { ...materials.concrete.density, value } } })} />
           <NumberField label="Concrete cover" path="concrete.cover" quantity={materials.concrete.cover} issue={issueAt("concrete.cover")} onChange={(value) => apply({ ...materials, concrete: { ...materials.concrete, cover: { ...materials.concrete.cover, value } } })} />
+        </div>
+        <div className="preset-selector">
+          <label><span>Rujukan Selimut Beton (SNI 2847:2019 Tabel 20.6.1.3.1)</span>
+            <select aria-label="Rujukan Selimut Beton" value={COVER_PRESETS.find((p) => p.cover === materials.concrete.cover.value)?.id ?? ""} onChange={(e) => e.target.value && apply(applyCoverPreset(materials, e.target.value))}>
+              <option value="">Pilih Kondisi Paparan untuk Mengisi Cover</option>
+              {COVER_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
+            </select>
+          </label>
         </div>
         <div className="derived-property" aria-label="Modulus elastisitas beton">
           <div><span>Elastic modulus, Ec</span><strong>Belum tersedia</strong></div>
@@ -67,6 +96,14 @@ function MaterialEditor({ initial, markUnsaved, saveMaterials, saveStatus }: {
 
       {tab === "longitudinal" && <section className="material-section" aria-labelledby="longitudinal-title">
         <SectionHeading eyebrow="Tulangan utama" title="Longitudinal Rebar" badge="INPUT" id="longitudinal-title" />
+        <div className="preset-selector">
+          <label><span>Pilihan Cepat Mutu Baja Tulangan</span>
+            <select aria-label="Pilihan Cepat Mutu Baja Tulangan" value={REBAR_PRESETS.find((p) => p.grade === materials.longitudinal_rebar.grade && p.fy === materials.longitudinal_rebar.fy.value)?.id ?? ""} onChange={(e) => e.target.value && apply(applyRebarPreset(materials, e.target.value))}>
+              <option value="">Pilih Mutu Baja (atau isi manual di bawah)</option>
+              {REBAR_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
+            </select>
+          </label>
+        </div>
         <div className="material-form">
           <TextField label="Mutu / grade" path="longitudinal_rebar.grade" value={materials.longitudinal_rebar.grade} issue={issueAt("longitudinal_rebar.grade")} onChange={(grade) => apply({ ...materials, longitudinal_rebar: { ...materials.longitudinal_rebar, grade } })} />
           <NumberField label="fy" path="longitudinal_rebar.fy" quantity={materials.longitudinal_rebar.fy} issue={issueAt("longitudinal_rebar.fy")} onChange={(value) => apply({ ...materials, longitudinal_rebar: { ...materials.longitudinal_rebar, fy: { ...materials.longitudinal_rebar.fy, value } } })} />
@@ -75,6 +112,11 @@ function MaterialEditor({ initial, markUnsaved, saveMaterials, saveStatus }: {
 
       {tab === "transverse" && <section className="material-section" aria-labelledby="transverse-title">
         <SectionHeading eyebrow="Sengkang / spiral" title="Transverse Rebar" badge="INPUT" id="transverse-title" />
+        <div className="preset-selector">
+          <button type="button" className="button button-secondary" onClick={() => apply({ ...materials, transverse_rebar: { ...materials.transverse_rebar, grade: materials.longitudinal_rebar.grade, fys: { ...materials.transverse_rebar.fys, value: Math.min(materials.longitudinal_rebar.fy.value ?? MAX_FYS_LIMIT, MAX_FYS_LIMIT) } } })}>
+            Samakan dengan Tulangan Utama (fys = {Math.min(materials.longitudinal_rebar.fy.value ?? MAX_FYS_LIMIT, MAX_FYS_LIMIT)} MPa)
+          </button>
+        </div>
         <div className="material-form">
           <TextField label="Mutu / grade" path="transverse_rebar.grade" value={materials.transverse_rebar.grade} issue={issueAt("transverse_rebar.grade")} onChange={(grade) => apply({ ...materials, transverse_rebar: { ...materials.transverse_rebar, grade } })} />
           <NumberField label="fys" path="transverse_rebar.fys" quantity={materials.transverse_rebar.fys} issue={issueAt("transverse_rebar.fys")} onChange={(value) => apply({ ...materials, transverse_rebar: { ...materials.transverse_rebar, fys: { ...materials.transverse_rebar.fys, value } } })} />
@@ -83,6 +125,11 @@ function MaterialEditor({ initial, markUnsaved, saveMaterials, saveStatus }: {
 
       {tab === "diameters" && <section className="material-section" aria-labelledby="diameters-title">
         <SectionHeading eyebrow="Pilihan desain" title="Available Diameters" badge="INPUT" id="diameters-title" />
+        <div className="preset-selector">
+          <button type="button" className="button button-secondary" onClick={() => apply(applyStandardDiameters(materials))}>
+            Gunakan Diameter Standar Pasar (D10, D13, D16, D19, D22, D25)
+          </button>
+        </div>
         <div className="table-scroll"><table className="geometry-table diameter-table"><thead><tr><th>Diameter nominal (mm)</th><th>Sumber</th><th><span className="sr-only">Aksi</span></th></tr></thead><tbody>
           {materials.available_diameters.map((diameter, index) => {
             const path = `available_diameters.${index}.nominal_diameter`;
