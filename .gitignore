@@ -24,3 +24,8 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+
+# SNI Documents
+docs/sni/*.pdf
+
+docs/sni/extracted/
