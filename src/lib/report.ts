@@ -1,6 +1,7 @@
 import { createEtabsHandoff } from "./etabs-handoff.ts";
 import type { ProjectBundle } from "./projects.ts";
 import { REPORT_MASTER_FILE, REPORT_TEMPLATE_MANIFEST } from "./report-template-manifest.ts";
+import { getCoefficientSourceLabel } from "./seismic.ts";
 
 export type ReportStatus = "READY" | "WARNING" | "BLOCKED";
 export type FigureSourceType = "AUTO_GENERATED" | "USER_UPLOAD" | "REFERENCE_PLACEHOLDER";
@@ -384,8 +385,8 @@ export function deriveAssumptionsAndDefaults(bundle: ProjectBundle): AssumptionP
 
   // 7. Seismik - Koefisien Situs Fa
   const isSfClass = bundle.seismic.raw_inputs.site_class === "SF";
-  const isFaManual = Boolean(bundle.seismic.raw_inputs.override_site_coefficients) || isSfClass;
-  const faSource = isSfClass ? "Manual (Wajib Uji Tanah SF)" : isFaManual ? "Manual (Override Pengguna)" : "Otomatis SNI 1726:2019";
+  const faSource = getCoefficientSourceLabel(bundle.seismic.input_provenance.fa?.source);
+  const isFaManual = faSource !== "otomatis SNI";
   items.push({
     category: "Seismik",
     parameter: `Koefisien situs Fa [Sumber: ${faSource}]`,
@@ -395,13 +396,13 @@ export function deriveAssumptionsAndDefaults(bundle: ProjectBundle): AssumptionP
     note: isSfClass
       ? "PERINGATAN: Kelas situs SF wajib penyelidikan geoteknik spesifik-situs (SNI 1726:2019 Pasal 6.10.1)"
       : isFaManual
-        ? "Override manual oleh pengguna"
+        ? faSource
         : "Interpolasi otomatis Tabel 6",
   });
 
   // 8. Seismik - Koefisien Situs Fv
-  const isFvManual = Boolean(bundle.seismic.raw_inputs.override_site_coefficients) || isSfClass;
-  const fvSource = isSfClass ? "Manual (Wajib Uji Tanah SF)" : isFvManual ? "Manual (Override Pengguna)" : "Otomatis SNI 1726:2019";
+  const fvSource = getCoefficientSourceLabel(bundle.seismic.input_provenance.fv?.source);
+  const isFvManual = fvSource !== "otomatis SNI";
   items.push({
     category: "Seismik",
     parameter: `Koefisien situs Fv [Sumber: ${fvSource}]`,
@@ -411,7 +412,7 @@ export function deriveAssumptionsAndDefaults(bundle: ProjectBundle): AssumptionP
     note: isSfClass
       ? "PERINGATAN: Kelas situs SF wajib penyelidikan geoteknik spesifik-situs (SNI 1726:2019 Pasal 6.10.1)"
       : isFvManual
-        ? "Override manual oleh pengguna"
+        ? fvSource
         : "Interpolasi otomatis Tabel 7",
   });
 

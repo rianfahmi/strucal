@@ -346,6 +346,15 @@ test("perlakuan batas dan nilai di luar rentang Tabel 6 dan 7", () => {
   assert.match(fvOver.notice ?? "", /di atas batas Tabel 7/);
 });
 
+test("label sumber koefisien membedakan otomatis, manual/PUSKIM, dan data lama", () => {
+  assert.equal(getCoefficientSourceLabel("otomatis SNI"), "otomatis SNI");
+  assert.equal(getCoefficientSourceLabel(" manual "), "manual");
+  assert.equal(getCoefficientSourceLabel("PUSKIM"), "manual");
+  for (const source of [undefined, "", "   "]) {
+    assert.equal(getCoefficientSourceLabel(source), "Input manual (data lama, sumber tidak tercatat)");
+  }
+});
+
 test("sinkronisasi otomatis dan override manual koefisien situs", () => {
   const model = createDefaultSeismic("rev-1", registryVersion);
   model.raw_inputs.site_class = "SD";

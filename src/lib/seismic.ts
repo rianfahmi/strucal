@@ -308,9 +308,10 @@ export function calculateFv(siteClass: string, s1: number | null): SiteCoefficie
   };
 }
 
-export function getCoefficientSourceLabel(provenanceSource?: string): "otomatis SNI" | "manual" {
-  if (!provenanceSource) return "manual";
-  return provenanceSource.trim().toLowerCase().startsWith("otomatis") ? "otomatis SNI" : "manual";
+export function getCoefficientSourceLabel(provenanceSource?: string): "otomatis SNI" | "manual" | "Input manual (data lama, sumber tidak tercatat)" {
+  const source = provenanceSource?.trim();
+  if (!source) return "Input manual (data lama, sumber tidak tercatat)";
+  return source.toLowerCase() === "otomatis sni" ? "otomatis SNI" : "manual";
 }
 
 export function syncSiteCoefficients(model: SeismicModel): SeismicModel {

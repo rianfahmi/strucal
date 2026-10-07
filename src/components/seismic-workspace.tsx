@@ -39,8 +39,8 @@ function SeismicEditor({ initial, context, registryVersion, markUnsaved, saveSei
   const isAutoFv = !isOverride && !isSf;
   const faCalc = calculateFa(model.raw_inputs.site_class, model.raw_inputs.ss);
   const fvCalc = calculateFv(model.raw_inputs.site_class, model.raw_inputs.s1);
-  const faSourceLabel = getCoefficientSourceLabel(model.input_provenance.fa.source);
-  const fvSourceLabel = getCoefficientSourceLabel(model.input_provenance.fv.source);
+  const faSourceLabel = getCoefficientSourceLabel(model.input_provenance.fa?.source);
+  const fvSourceLabel = getCoefficientSourceLabel(model.input_provenance.fv?.source);
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -115,7 +115,7 @@ function SeismicEditor({ initial, context, registryVersion, markUnsaved, saveSei
     </div>
 
     {tab === "input" && <section aria-labelledby="seismic-input-title">
-      <Heading id="seismic-input-title" title="Parameter Seismik &amp; Koefisien Situs" badge={isOverride || isSf ? "MANUAL" : "AUTO SNI"} />
+      <Heading id="seismic-input-title" title="Parameter Seismik &amp; Koefisien Situs" badge={faSourceLabel === fvSourceLabel ? faSourceLabel : `Fa: ${faSourceLabel} · Fv: ${fvSourceLabel}`} />
       <p className="seismic-input-note">
         Koefisien situs Fa dan Fv dihitung otomatis dengan interpolasi linier sesuai SNI 1726:2019 Tabel 6 dan Tabel 7 (hlm. 34). Override manual tersedia pada Pengaturan Lanjutan.
       </p>
@@ -143,12 +143,12 @@ function SeismicEditor({ initial, context, registryVersion, markUnsaved, saveSei
             <div className="number-with-unit">
               <input type="number" readOnly disabled value={model.raw_inputs.fa ?? ""} />
               <span>-</span>
-              <small className="badge badge-auto">otomatis SNI</small>
+              <small className={`badge ${faSourceLabel === "otomatis SNI" ? "badge-auto" : "badge-input"}`}>{faSourceLabel}</small>
             </div>
-            <small className="field-note">Interpolasi Tabel 6 (SNI 1726:2019 hlm. 34)</small>
+            <small className="field-note">{faSourceLabel === "otomatis SNI" ? "Interpolasi Tabel 6 (SNI 1726:2019 hlm. 34)" : faSourceLabel}</small>
           </label>
         ) : (
-          <NumberInput label="Fa (koefisien situs)" value={model.raw_inputs.fa} unit="-" issue={issues.find(({ path }) => path === "raw_inputs.fa")?.message} sourceLabel="manual" onChange={(value) => setRaw("fa", value)} />
+          <NumberInput label="Fa (koefisien situs)" value={model.raw_inputs.fa} unit="-" issue={issues.find(({ path }) => path === "raw_inputs.fa")?.message} sourceLabel={faSourceLabel} onChange={(value) => setRaw("fa", value)} />
         )}
 
         {isAutoFv ? (
@@ -157,12 +157,12 @@ function SeismicEditor({ initial, context, registryVersion, markUnsaved, saveSei
             <div className="number-with-unit">
               <input type="number" readOnly disabled value={model.raw_inputs.fv ?? ""} />
               <span>-</span>
-              <small className="badge badge-auto">otomatis SNI</small>
+              <small className={`badge ${fvSourceLabel === "otomatis SNI" ? "badge-auto" : "badge-input"}`}>{fvSourceLabel}</small>
             </div>
-            <small className="field-note">Interpolasi Tabel 7 (SNI 1726:2019 hlm. 34)</small>
+            <small className="field-note">{fvSourceLabel === "otomatis SNI" ? "Interpolasi Tabel 7 (SNI 1726:2019 hlm. 34)" : fvSourceLabel}</small>
           </label>
         ) : (
-          <NumberInput label="Fv (koefisien situs)" value={model.raw_inputs.fv} unit="-" issue={issues.find(({ path }) => path === "raw_inputs.fv")?.message} sourceLabel="manual" onChange={(value) => setRaw("fv", value)} />
+          <NumberInput label="Fv (koefisien situs)" value={model.raw_inputs.fv} unit="-" issue={issues.find(({ path }) => path === "raw_inputs.fv")?.message} sourceLabel={fvSourceLabel} onChange={(value) => setRaw("fv", value)} />
         )}
       </div>
 

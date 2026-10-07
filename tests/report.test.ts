@@ -199,7 +199,8 @@ test("deriveAssumptionsAndDefaults merekam 9 parameter inti, mendeteksi DEFAULT_
   // Cek sumber Fa/Fv
   const fa = items.find((i) => i.parameter.startsWith("Koefisien situs Fa"));
   assert.ok(fa);
-  assert.match(fa.parameter, /Otomatis SNI 1726:2019/);
+  assert.match(fa.parameter, /Sumber: manual/);
+  assert.equal(fa.status, "OVERRIDE_USER");
 
   // Jika kelas situs SF, tampil peringatan evaluasi geoteknik spesifik-situs
   const sfBundle = structuredClone(bundle);
@@ -225,5 +226,43 @@ test("DOCX menyertakan tabel Daftar Asumsi dan Nilai Default Perencanaan", () =>
   assert.match(document, /Berat jenis beton/);
   assert.match(document, /Tebal selimut beton/);
   assert.match(document, /Balok \/ Kolom/);
+});
+
+test("Asumsi & Default mengikuti provenance Fa/Fv, termasuk data lama, tanpa bergantung pada override", () => {
+  for (const [source, label, status, override] of [
+    ["otomatis SNI", "otomatis SNI", "DEFAULT_SNI", true],
+    ["manual", "manual", "OVERRIDE_USER", false],
+    ["PUSKIM", "manual", "OVERRIDE_USER", false],
+    ["", "Input manual (data lama, sumber tidak tercatat)", "OVERRIDE_USER", false],
+    ["   ", "Input manual (data lama, sumber tidak tercatat)", "OVERRIDE_USER", false],
+  ] as const) {
+    const bundle = completeProjectBundle();
+    bundle.seismic.raw_inputs.override_site_coefficients = override;
+    for (const key of ["fa", "fv"] as const) bundle.seismic.input_provenance[key].source = source;
+    const items = deriveAssumptionsAndDefaults(bundle).filter(({ parameter }) => parameter.startsWith("Koefisien situs"));
+    assert.equal(items.length, 2);
+    for (const item of items) {
+      assert.ok(item.parameter.endsWith(`[Sumber: ${label}]`));
+      assert.equal(item.status, status);
+      if (status === "OVERRIDE_USER") assert.doesNotMatch(item.note, /[Ii]nterpolasi otomatis/);
+    }
+  }
+  const legacy = completeProjectBundle();
+  for (const key of ["fa", "fv"] as const) delete (legacy.seismic.input_provenance[key] as Partial<typeof legacy.seismic.input_provenance.fa>).source;
+  legacy.seismic = normalizeSeismic(legacy.seismic, legacy.revision.id, legacy.revision.registry_version);
+  assert.ok(deriveAssumptionsAndDefaults(legacy).filter(({ parameter }) => parameter.startsWith("Koefisien situs")).every(({ parameter }) => parameter.includes("Input manual (data lama, sumber tidak tercatat)")));
+});
+
+test("DOCX memakai label provenance Fa/Fv yang sama dengan Asumsi & Default", () => {
+  for (const [faSource, fvSource] of [["otomatis SNI", "manual"], ["PUSKIM", "otomatis SNI"]]) {
+    const { bundle, snapshot } = createSnapshot();
+    bundle.seismic.input_provenance.fa.source = faSource;
+    bundle.seismic.input_provenance.fv.source = fvSource;
+    const document = text(unzip(generateReportDocx({ bundle, snapshot, assets: [] })), "word/document.xml");
+    const items = deriveAssumptionsAndDefaults(bundle).filter(({ parameter }) => parameter.startsWith("Koefisien situs"));
+    for (const item of items) assert.ok(document.includes(item.parameter));
+    for (const key of ["fa", "fv"] as const) bundle.seismic.input_provenance[key].source = "";
+    assert.throws(() => generateReportDocx({ bundle, snapshot, assets: [] }), /Kesiapan handoff ETABS harus READY/);
+  }
 });
 
