@@ -223,48 +223,66 @@ function GeometryEditor({ initial, markUnsaved, saveGeometry, saveStatus }: {
           </div>
         </div>
 
-        <div className="geometry-tabs" role="tablist" aria-label="Data geometri">
-          <button role="tab" aria-selected={tab === "grid"} className={tab === "grid" ? "active" : ""} type="button" onClick={() => setTab("grid")}>Grid System</button>
-          <button role="tab" aria-selected={tab === "story"} className={tab === "story" ? "active" : ""} type="button" onClick={() => setTab("story")}>Story Data</button>
+        <div className="load-kpis" style={{ margin: "1rem 0" }}>
+          <article>
+            <span>Total As Grid</span>
+            <strong>{geometry.grid_x.length} as X · {geometry.grid_y.length} as Y</strong>
+            <small>{geometry.grid_x.length - 1} bentang X · {geometry.grid_y.length - 1} bentang Y</small>
+          </article>
+          <article>
+            <span>Total Tingkat &amp; Elevasi</span>
+            <strong>{geometry.stories.length} level ({geometry.stories.at(-1)?.elevation ?? 0} m)</strong>
+            <small>{geometry.stories.length - 1} lantai di atas tanah</small>
+          </article>
         </div>
 
+        <details className="advanced-settings">
+          <summary>Pengaturan Lanjutan: Kustomisasi As Grid &amp; Story Manual</summary>
+          <div className="advanced-settings-content">
+            <div className="geometry-tabs" role="tablist" aria-label="Data geometri">
+              <button role="tab" aria-selected={tab === "grid"} className={tab === "grid" ? "active" : ""} type="button" onClick={() => setTab("grid")}>Grid System</button>
+              <button role="tab" aria-selected={tab === "story"} className={tab === "story" ? "active" : ""} type="button" onClick={() => setTab("story")}>Story Data</button>
+            </div>
 
-        {tab === "grid" ? <div className="axis-stack">
-          {(["X", "Y"] as const).map((axis) => {
-            const lines = axis === "X" ? geometry.grid_x : geometry.grid_y;
-            const spacings = spacingsFromOrdinates(lines.map(({ ordinate }) => ordinate));
-            return <section className="data-section" key={axis} aria-labelledby={`grid-${axis}-title`}>
-              <div className="data-section-heading"><div><p className="eyebrow">Sumbu {axis}</p><h2 id={`grid-${axis}-title`}>Grid {axis}</h2></div><div className="segmented" aria-label={`Mode input grid ${axis}`}>
-                <button type="button" className={modes[axis] === "spacing" ? "active" : ""} onClick={() => setModes({ ...modes, [axis]: "spacing" })}>Spacing</button>
-                <button type="button" className={modes[axis] === "ordinate" ? "active" : ""} onClick={() => setModes({ ...modes, [axis]: "ordinate" })}>Ordinate</button>
-              </div></div>
-              <div className="table-scroll"><table className="geometry-table"><thead><tr><th>Label</th><th>{modes[axis] === "spacing" ? "Spacing (m)" : "Ordinate (m)"}</th><th><span className="sr-only">Aksi</span></th></tr></thead><tbody>
-                {lines.map((line, index) => <tr key={`${axis}-${index}`}>
-                  <td><input aria-label={`Label grid ${axis} ${index + 1}`} value={line.label} onChange={(event) => editGrid(axis, (current) => current.map((item, lineIndex) => lineIndex === index ? { ...item, label: event.target.value } : item))} /></td>
-                  <td>{modes[axis] === "spacing" && index === 0 ? <span className="auto-value">0.000 <small>ORIGIN</small></span> : <input aria-label={`${modes[axis]} grid ${axis} ${line.label}`} type="number" step="any" value={modes[axis] === "spacing" ? spacings[index - 1] : line.ordinate} onChange={(event) => {
-                    if (!event.target.value) return;
-                    const value = event.target.valueAsNumber;
-                    editGrid(axis, (current) => modes[axis] === "spacing" ? replaceGridSpacing(current, index, value) : replaceGridOrdinate(current, index, value));
-                  }} />}</td>
-                  <td><button className="icon-button" type="button" aria-label={`Hapus grid ${axis} ${line.label}`} onClick={() => removeGrid(axis, index)}>×</button></td>
+            {tab === "grid" ? <div className="axis-stack">
+              {(["X", "Y"] as const).map((axis) => {
+                const lines = axis === "X" ? geometry.grid_x : geometry.grid_y;
+                const spacings = spacingsFromOrdinates(lines.map(({ ordinate }) => ordinate));
+                return <section className="data-section" key={axis} aria-labelledby={`grid-${axis}-title`}>
+                  <div className="data-section-heading"><div><p className="eyebrow">Sumbu {axis}</p><h2 id={`grid-${axis}-title`}>Grid {axis}</h2></div><div className="segmented" aria-label={`Mode input grid ${axis}`}>
+                    <button type="button" className={modes[axis] === "spacing" ? "active" : ""} onClick={() => setModes({ ...modes, [axis]: "spacing" })}>Spacing</button>
+                    <button type="button" className={modes[axis] === "ordinate" ? "active" : ""} onClick={() => setModes({ ...modes, [axis]: "ordinate" })}>Ordinate</button>
+                  </div></div>
+                  <div className="table-scroll"><table className="geometry-table"><thead><tr><th>Label</th><th>{modes[axis] === "spacing" ? "Spacing (m)" : "Ordinate (m)"}</th><th><span className="sr-only">Aksi</span></th></tr></thead><tbody>
+                    {lines.map((line, index) => <tr key={`${axis}-${index}`}>
+                      <td><input aria-label={`Label grid ${axis} ${index + 1}`} value={line.label} onChange={(event) => editGrid(axis, (current) => current.map((item, lineIndex) => lineIndex === index ? { ...item, label: event.target.value } : item))} /></td>
+                      <td>{modes[axis] === "spacing" && index === 0 ? <span className="auto-value">0.000 <small>ORIGIN</small></span> : <input aria-label={`${modes[axis]} grid ${axis} ${line.label}`} type="number" step="any" value={modes[axis] === "spacing" ? spacings[index - 1] : line.ordinate} onChange={(event) => {
+                        if (!event.target.value) return;
+                        const value = event.target.valueAsNumber;
+                        editGrid(axis, (current) => modes[axis] === "spacing" ? replaceGridSpacing(current, index, value) : replaceGridOrdinate(current, index, value));
+                      }} />}</td>
+                      <td><button className="icon-button" type="button" aria-label={`Hapus grid ${axis} ${line.label}`} onClick={() => removeGrid(axis, index)}>×</button></td>
+                    </tr>)}
+                  </tbody></table></div>
+                  <button className="button button-secondary add-row" type="button" onClick={() => addGrid(axis)}>+ Tambah Grid {axis}</button>
+                </section>;
+              })}
+            </div> : <section className="data-section" aria-labelledby="story-title">
+              <div className="data-section-heading"><div><p className="eyebrow">Level bangunan</p><h2 id="story-title">Story Data</h2></div><span className="badge badge-neutral">Elevasi otomatis</span></div>
+              <div className="table-scroll"><table className="geometry-table story-table"><thead><tr><th>Urutan</th><th>Nama</th><th>Height (m)</th><th>Elevation (m)</th><th><span className="sr-only">Aksi</span></th></tr></thead><tbody>
+                {geometry.stories.map((story, index) => <tr key={index}>
+                  <td><span className="order-actions"><button type="button" aria-label={`Turunkan ${story.name}`} disabled={index <= 1} onClick={() => moveStory(index, -1)}>↓</button><button type="button" aria-label={`Naikkan ${story.name}`} disabled={index === 0 || index === geometry.stories.length - 1} onClick={() => moveStory(index, 1)}>↑</button></span></td>
+                  <td><input aria-label={`Nama story ${index + 1}`} value={story.name} onChange={(event) => editStory(index, "name", event.target.value)} /></td>
+                  <td>{index === 0 ? <span className="auto-value">0.000 <small>BASE</small></span> : <input aria-label={`Tinggi ${story.name}`} type="number" min={GEOMETRY_TOLERANCE} step="any" value={story.height} onChange={(event) => event.target.value && editStory(index, "height", event.target.valueAsNumber)} />}</td>
+                  <td>{index === 0 ? <input aria-label="Elevasi dasar" type="number" step="any" value={story.elevation} onChange={(event) => event.target.value && editStory(0, "elevation", event.target.valueAsNumber)} /> : <span className="auto-value">{story.elevation.toFixed(3)} <small>AUTO</small></span>}</td>
+                  <td><button className="icon-button" type="button" aria-label={`Hapus ${story.name}`} disabled={index === 0} onClick={() => removeStory(index)}>×</button></td>
                 </tr>)}
               </tbody></table></div>
-              <button className="button button-secondary add-row" type="button" onClick={() => addGrid(axis)}>+ Tambah Grid {axis}</button>
-            </section>;
-          })}
-        </div> : <section className="data-section" aria-labelledby="story-title">
-          <div className="data-section-heading"><div><p className="eyebrow">Level bangunan</p><h2 id="story-title">Story Data</h2></div><span className="badge badge-neutral">Elevasi otomatis</span></div>
-          <div className="table-scroll"><table className="geometry-table story-table"><thead><tr><th>Urutan</th><th>Nama</th><th>Height (m)</th><th>Elevation (m)</th><th><span className="sr-only">Aksi</span></th></tr></thead><tbody>
-            {geometry.stories.map((story, index) => <tr key={index}>
-              <td><span className="order-actions"><button type="button" aria-label={`Turunkan ${story.name}`} disabled={index <= 1} onClick={() => moveStory(index, -1)}>↓</button><button type="button" aria-label={`Naikkan ${story.name}`} disabled={index === 0 || index === geometry.stories.length - 1} onClick={() => moveStory(index, 1)}>↑</button></span></td>
-              <td><input aria-label={`Nama story ${index + 1}`} value={story.name} onChange={(event) => editStory(index, "name", event.target.value)} /></td>
-              <td>{index === 0 ? <span className="auto-value">0.000 <small>BASE</small></span> : <input aria-label={`Tinggi ${story.name}`} type="number" min={GEOMETRY_TOLERANCE} step="any" value={story.height} onChange={(event) => event.target.value && editStory(index, "height", event.target.valueAsNumber)} />}</td>
-              <td>{index === 0 ? <input aria-label="Elevasi dasar" type="number" step="any" value={story.elevation} onChange={(event) => event.target.value && editStory(0, "elevation", event.target.valueAsNumber)} /> : <span className="auto-value">{story.elevation.toFixed(3)} <small>AUTO</small></span>}</td>
-              <td><button className="icon-button" type="button" aria-label={`Hapus ${story.name}`} disabled={index === 0} onClick={() => removeStory(index)}>×</button></td>
-            </tr>)}
-          </tbody></table></div>
-          <button className="button button-secondary add-row" type="button" onClick={addStory}>+ Tambah Story</button>
-        </section>}
+              <button className="button button-secondary add-row" type="button" onClick={addStory}>+ Tambah Story</button>
+            </section>}
+          </div>
+        </details>
+
 
         <div className={`geometry-validation ${issues.length || inputError ? "has-error" : "is-valid"}`} role="status">
           <strong>{issues.length || inputError ? "Geometri perlu diperbaiki" : "Geometri valid"}</strong>

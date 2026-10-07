@@ -152,19 +152,42 @@ function LoadEditor({ initial, geometry, registryVersion, markUnsaved, saveLoads
         </div>
       </div>
 
-      <div className="table-scroll"><table className="load-table load-definition-table"><thead><tr><th>Nama / kategori</th><th>Nilai</th><th>Aplikasi</th><th>Faktor W</th><th>Sumber</th><th>Asumsi</th><th>Provenance</th><th><span className="sr-only">Aksi</span></th></tr></thead><tbody>
-        {loads.definitions.map((definition, index) => <tr key={definition.id}>
-          <td><input aria-label={`Nama load ${index + 1}`} value={definition.name} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, name: event.target.value }))} /><select aria-label={`Kategori load ${index + 1}`} value={definition.category} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, category: event.target.value as LoadCategory }))}>{Object.entries(LOAD_CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td>
-          <td><div className="compact-number"><input aria-label={`Nilai ${definition.name}`} type="number" step="any" value={definition.value ?? ""} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, value: event.target.value === "" ? null : Number(event.target.value) }))} /><span>{definition.unit}</span></div></td>
-          <td><select aria-label={`Aplikasi ${definition.name}`} value={definition.application} onChange={(event) => updateDefinition(definition.id, (item) => changeLoadApplication(item, event.target.value as LoadApplication))}><option value="UNIFORM_AREA">Area merata</option><option value="UNIFORM_LINE">Garis merata</option></select></td>
-          <td><div className="compact-number"><input aria-label={`Faktor berat seismik ${definition.name}`} type="number" min="0" max="1" step="any" value={definition.seismic_weight_factor ?? ""} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, seismic_weight_factor: event.target.value === "" ? null : Number(event.target.value) }))} /><span>×</span></div></td>
-          <td><input aria-label={`Sumber ${definition.name}`} value={definition.source} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, source: event.target.value }))} /></td>
-          <td><input aria-label={`Asumsi ${definition.name}`} value={definition.assumption} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, assumption: event.target.value }))} /></td>
-          <td><span className="badge badge-input">{definition.provenance}</span></td>
-          <td>{definition.category === "SEISMIC" && <button className="icon-button" type="button" aria-label={`Hapus ${definition.name}`} onClick={() => apply({ ...loads, definitions: loads.definitions.filter(({ id }) => id !== definition.id), assignments: loads.assignments.filter(({ load_id }) => load_id !== definition.id) })}>×</button>}</td>
-        </tr>)}
-      </tbody></table></div>
-      <button className="button button-secondary add-row" type="button" onClick={addDefinition}>+ Tambah Load</button>
+      <div className="load-kpis" style={{ margin: "1rem 0" }}>
+        <article>
+          <span>Beban Hidup (Live)</span>
+          <strong>{loads.definitions.find((d) => d.category === "LIVE")?.value ?? "—"} kN/m²</strong>
+          <small>{loads.definitions.find((d) => d.category === "LIVE")?.source || "Belum ditentukan"}</small>
+        </article>
+        <article>
+          <span>Finishing &amp; Partisi (SIDL)</span>
+          <strong>{loads.definitions.find((d) => d.category === "SUPERIMPOSED_DEAD")?.value ?? "—"} kN/m²</strong>
+          <small>{loads.definitions.find((d) => d.category === "SUPERIMPOSED_DEAD")?.source || "Belum ditentukan"}</small>
+        </article>
+        <article>
+          <span>Berat Sendiri (Self Weight)</span>
+          <strong>{loads.definitions.find((d) => d.category === "SELF_WEIGHT")?.value ?? "—"} kN/m²</strong>
+          <small>{loads.definitions.find((d) => d.category === "SELF_WEIGHT")?.source || "Belum ditentukan"}</small>
+        </article>
+      </div>
+
+      <details className="advanced-settings">
+        <summary>Pengaturan Lanjutan: Tabel Definisi Beban &amp; Penyesuaian Nilai</summary>
+        <div className="advanced-settings-content">
+          <div className="table-scroll"><table className="load-table load-definition-table"><thead><tr><th>Nama / kategori</th><th>Nilai</th><th>Aplikasi</th><th>Faktor W</th><th>Sumber</th><th>Asumsi</th><th>Provenance</th><th><span className="sr-only">Aksi</span></th></tr></thead><tbody>
+            {loads.definitions.map((definition, index) => <tr key={definition.id}>
+              <td><input aria-label={`Nama load ${index + 1}`} value={definition.name} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, name: event.target.value }))} /><select aria-label={`Kategori load ${index + 1}`} value={definition.category} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, category: event.target.value as LoadCategory }))}>{Object.entries(LOAD_CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td>
+              <td><div className="compact-number"><input aria-label={`Nilai ${definition.name}`} type="number" step="any" value={definition.value ?? ""} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, value: event.target.value === "" ? null : Number(event.target.value) }))} /><span>{definition.unit}</span></div></td>
+              <td><select aria-label={`Aplikasi ${definition.name}`} value={definition.application} onChange={(event) => updateDefinition(definition.id, (item) => changeLoadApplication(item, event.target.value as LoadApplication))}><option value="UNIFORM_AREA">Area merata</option><option value="UNIFORM_LINE">Garis merata</option></select></td>
+              <td><div className="compact-number"><input aria-label={`Faktor berat seismik ${definition.name}`} type="number" min="0" max="1" step="any" value={definition.seismic_weight_factor ?? ""} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, seismic_weight_factor: event.target.value === "" ? null : Number(event.target.value) }))} /><span>×</span></div></td>
+              <td><input aria-label={`Sumber ${definition.name}`} value={definition.source} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, source: event.target.value }))} /></td>
+              <td><input aria-label={`Asumsi ${definition.name}`} value={definition.assumption} onChange={(event) => updateDefinition(definition.id, (item) => ({ ...item, assumption: event.target.value }))} /></td>
+              <td><span className="badge badge-input">{definition.provenance}</span></td>
+              <td>{definition.category === "SEISMIC" && <button className="icon-button" type="button" aria-label={`Hapus ${definition.name}`} onClick={() => apply({ ...loads, definitions: loads.definitions.filter(({ id }) => id !== definition.id), assignments: loads.assignments.filter(({ load_id }) => load_id !== definition.id) })}>×</button>}</td>
+            </tr>)}
+          </tbody></table></div>
+          <button className="button button-secondary add-row" type="button" onClick={addDefinition}>+ Tambah Load</button>
+        </div>
+      </details>
     </section>}
 
     {tab === "assignments" && <section aria-labelledby="load-assignments-title">
@@ -198,14 +221,28 @@ function LoadEditor({ initial, geometry, registryVersion, markUnsaved, saveLoads
         </div>
       </div>
 
-      <div className="assignment-form">
-        <label><span>Load definition</span><select value={assignmentLoadId} onChange={(event) => { setAssignmentLoadId(event.target.value); setAssignmentTargetId(""); }}>{loads.definitions.map((definition) => <option key={definition.id} value={definition.id}>{definition.name} · {definition.unit}</option>)}</select></label>
-        <label><span>Target / application</span><select value={assignmentTargetId} onChange={(event) => setAssignmentTargetId(event.target.value)}><option value="">Pilih target aktual</option>{compatibleTargets.map((target) => <option key={target.id} value={target.id}>{target.label} · {target.measure} {target.measure_unit}</option>)}</select></label>
-        <label><span>Asumsi assignment</span><input value={assignmentAssumption} onChange={(event) => setAssignmentAssumption(event.target.value)} /></label>
-        <button className="button button-secondary" type="button" disabled={!assignmentTargetId || !assignmentAssumption.trim()} onClick={addAssignment}>Tambah Assignment</button>
+      <div className="load-kpis" style={{ margin: "1rem 0" }}>
+        <article>
+          <span>Total Penugasan Aktif</span>
+          <strong>{loads.assignments.length} target</strong>
+          <small>{loads.assignments.filter((a) => a.target_type === "STORY_AREA").length} area lantai · {loads.assignments.filter((a) => a.target_type === "GRID_LINE").length} garis grid</small>
+        </article>
       </div>
-      <AssignmentTable assignments={loads.assignments} definitions={loads.definitions} targets={targets} onDelete={(id) => apply({ ...loads, assignments: loads.assignments.filter((assignment) => assignment.id !== id) })} />
+
+      <details className="advanced-settings">
+        <summary>Pengaturan Lanjutan: Penugasan Manual per Elemen / Lantai</summary>
+        <div className="advanced-settings-content">
+          <div className="assignment-form">
+            <label><span>Load definition</span><select value={assignmentLoadId} onChange={(event) => { setAssignmentLoadId(event.target.value); setAssignmentTargetId(""); }}>{loads.definitions.map((definition) => <option key={definition.id} value={definition.id}>{definition.name} · {definition.unit}</option>)}</select></label>
+            <label><span>Target / application</span><select value={assignmentTargetId} onChange={(event) => setAssignmentTargetId(event.target.value)}><option value="">Pilih target aktual</option>{compatibleTargets.map((target) => <option key={target.id} value={target.id}>{target.label} · {target.measure} {target.measure_unit}</option>)}</select></label>
+            <label><span>Asumsi assignment</span><input value={assignmentAssumption} onChange={(event) => setAssignmentAssumption(event.target.value)} /></label>
+            <button className="button button-secondary" type="button" disabled={!assignmentTargetId || !assignmentAssumption.trim()} onClick={addAssignment}>Tambah Assignment</button>
+          </div>
+          <AssignmentTable assignments={loads.assignments} definitions={loads.definitions} targets={targets} onDelete={(id) => apply({ ...loads, assignments: loads.assignments.filter((assignment) => assignment.id !== id) })} />
+        </div>
+      </details>
     </section>}
+
 
 
     {tab === "gravity" && <LoadReview title="Gravity Loads" definitions={loads.definitions.filter(({ category }) => gravityCategories.has(category))} assignments={loads.assignments} />}

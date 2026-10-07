@@ -77,17 +77,26 @@ function MaterialEditor({ initial, markUnsaved, saveMaterials, saveStatus }: {
         <div className="material-form">
           <TextField label="Mutu / grade" path="concrete.grade" value={materials.concrete.grade} issue={issueAt("concrete.grade")} onChange={(grade) => apply({ ...materials, concrete: { ...materials.concrete, grade } })} />
           <NumberField label="fc'" path="concrete.fc" quantity={materials.concrete.fc} issue={issueAt("concrete.fc")} onChange={(value) => apply({ ...materials, concrete: { ...materials.concrete, fc: { ...materials.concrete.fc, value } } })} />
-          <NumberField label="Density" path="concrete.density" quantity={materials.concrete.density} issue={issueAt("concrete.density")} onChange={(value) => apply({ ...materials, concrete: { ...materials.concrete, density: { ...materials.concrete.density, value } } })} />
-          <NumberField label="Concrete cover" path="concrete.cover" quantity={materials.concrete.cover} issue={issueAt("concrete.cover")} onChange={(value) => apply({ ...materials, concrete: { ...materials.concrete, cover: { ...materials.concrete.cover, value } } })} />
         </div>
-        <div className="preset-selector">
-          <label><span>Rujukan Selimut Beton (SNI 2847:2019 Tabel 20.6.1.3.1)</span>
-            <select aria-label="Rujukan Selimut Beton" value={COVER_PRESETS.find((p) => p.cover === materials.concrete.cover.value)?.id ?? ""} onChange={(e) => e.target.value && apply(applyCoverPreset(materials, e.target.value))}>
-              <option value="">Pilih Kondisi Paparan untuk Mengisi Cover</option>
-              {COVER_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
-            </select>
-          </label>
-        </div>
+
+        <details className="advanced-settings">
+          <summary>Pengaturan Lanjutan (Berat Jenis &amp; Selimut Beton)</summary>
+          <div className="advanced-settings-content">
+            <div className="material-form">
+              <NumberField label="Berat jenis beton (Density)" path="concrete.density" quantity={materials.concrete.density} issue={issueAt("concrete.density")} onChange={(value) => apply({ ...materials, concrete: { ...materials.concrete, density: { ...materials.concrete.density, value } } })} />
+              <NumberField label="Tebal selimut beton (Cover)" path="concrete.cover" quantity={materials.concrete.cover} issue={issueAt("concrete.cover")} onChange={(value) => apply({ ...materials, concrete: { ...materials.concrete, cover: { ...materials.concrete.cover, value } } })} />
+            </div>
+            <div className="preset-selector">
+              <label><span>Rujukan Selimut Beton (SNI 2847:2019 Tabel 20.6.1.3.1)</span>
+                <select aria-label="Rujukan Selimut Beton" value={COVER_PRESETS.find((p) => p.cover === materials.concrete.cover.value)?.id ?? ""} onChange={(e) => e.target.value && apply(applyCoverPreset(materials, e.target.value))}>
+                  <option value="">Pilih Kondisi Paparan untuk Mengisi Cover</option>
+                  {COVER_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
+                </select>
+              </label>
+            </div>
+          </div>
+        </details>
+
         <div className="derived-property" aria-label="Modulus elastisitas beton">
           <div><span>Elastic modulus, Ec</span><strong>Belum tersedia</strong></div>
           <div><span className="badge badge-code">CODE</span><small>Rumus belum tersedia pada registry yang disetujui.</small></div>
