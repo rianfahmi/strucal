@@ -286,3 +286,132 @@ export function isReportSnapshotStale(snapshot: ReportSnapshot, bundle: ProjectB
     || snapshot.registry_version !== bundle.revision.registry_version
     || snapshot.combination_registry_version !== bundle.loads.combination_registry_version;
 }
+
+export type AssumptionParameter = {
+  category: "Material" | "Pembebanan" | "Seismik";
+  parameter: string;
+  value: string;
+  standard_ref: string;
+  status: "DEFAULT_SNI" | "OVERRIDE_USER";
+  note: string;
+};
+
+export function deriveAssumptionsAndDefaults(bundle: ProjectBundle): AssumptionParameter[] {
+  const items: AssumptionParameter[] = [];
+
+  // 1. Material - Berat jenis beton
+  const density = bundle.materials.concrete.density.value;
+  const isDefaultDensity = density === 2400;
+  items.push({
+    category: "Material",
+    parameter: "Berat jenis beton (Density)",
+    value: `${density ?? "—"} kg/m³`,
+    standard_ref: "SNI 1727:2020 Tabel C3.1-2 hlm. 282 (PDF hlm. 314)",
+    status: isDefaultDensity ? "DEFAULT_SNI" : "OVERRIDE_USER",
+    note: isDefaultDensity ? "Nilai standar beton bertulang (2.400 kg/m³)" : "Nilai disesuaikan oleh pengguna",
+  });
+
+  // 2. Material - Selimut beton
+  const cover = bundle.materials.concrete.cover.value;
+  const isDefaultCover = cover === 40;
+  items.push({
+    category: "Material",
+    parameter: "Tebal selimut beton (Cover)",
+    value: `${cover ?? "—"} mm`,
+    standard_ref: "SNI 2847:2019 Tabel 20.6.1.3.1 hlm. 460 (PDF hlm. 482)",
+    status: isDefaultCover ? "DEFAULT_SNI" : "OVERRIDE_USER",
+    note: isDefaultCover ? "Standar komponen balok/kolom tidak terpapar cuaca (40 mm)" : "Nilai disesuaikan oleh pengguna",
+  });
+
+  // 3. Material - Tulangan transversal fys
+  const fys = bundle.materials.transverse_rebar.fys.value;
+  const fy = bundle.materials.longitudinal_rebar.fy.value;
+  const expectedDefaultFys = Math.min(fy ?? 420, 420);
+  const isDefaultFys = fys === expectedDefaultFys;
+  items.push({
+    category: "Material",
+    parameter: "Kuat leleh tulangan transversal (fys)",
+    value: `${fys ?? "—"} MPa`,
+    standard_ref: "SNI 2847:2019 Tabel 20.2.2.4a hlm. 450 (PDF hlm. 472)",
+    status: isDefaultFys ? "DEFAULT_SNI" : "OVERRIDE_USER",
+    note: fys && fys > 420 ? "Melebihi batas izin geser (Maksimal 420 MPa)" : isDefaultFys ? "Mengikuti kuat leleh utama dengan batas 420 MPa" : "Nilai disesuaikan manual oleh pengguna",
+  });
+
+  // 4. Pembebanan - Beban Hidup
+  const liveDef = bundle.loads.definitions.find((d) => d.category === "LIVE");
+  if (liveDef) {
+    const isLiveFromPreset = liveDef.source.includes("SNI 1727:2020");
+    items.push({
+      category: "Pembebanan",
+      parameter: `Beban hidup (${liveDef.name})`,
+      value: `${liveDef.value ?? "—"} ${liveDef.unit}`,
+      standard_ref: liveDef.source || "SNI 1727:2020 Tabel 4.3-1 hlm. 26 (PDF hlm. 58)",
+      status: isLiveFromPreset ? "DEFAULT_SNI" : "OVERRIDE_USER",
+      note: liveDef.assumption || "Beban hidup seragam area lantai",
+    });
+  }
+
+  // 5. Pembebanan - Beban Mati Tambahan (SIDL / Partisi)
+  const sidlDef = bundle.loads.definitions.find((d) => d.category === "SUPERIMPOSED_DEAD");
+  if (sidlDef) {
+    const isSidlFromPreset = sidlDef.source.includes("SNI 1727:2020");
+    items.push({
+      category: "Pembebanan",
+      parameter: `Beban mati tambahan (${sidlDef.name})`,
+      value: `${sidlDef.value ?? "—"} ${sidlDef.unit}`,
+      standard_ref: sidlDef.source || "SNI 1727:2020 Tabel C3.1-2 hlm. 282 (PDF hlm. 314)",
+      status: isSidlFromPreset ? "DEFAULT_SNI" : "OVERRIDE_USER",
+      note: sidlDef.assumption || "Finishing spesi dan partisi",
+    });
+  }
+
+  // 6. Pembebanan - Faktor Berat Seismik W
+  const swFactorsMatch = bundle.loads.definitions.every((d) => {
+    if (d.category === "SELF_WEIGHT" || d.category === "SUPERIMPOSED_DEAD") return d.seismic_weight_factor === 1.0;
+    if (d.category === "LIVE" || d.category === "ROOF_LIVE" || d.category === "WIND" || d.category === "RAIN") return d.seismic_weight_factor === 0.0;
+    return true;
+  });
+  items.push({
+    category: "Pembebanan",
+    parameter: "Faktor pengali berat seismik efektif (W)",
+    value: "Mati: 1,0 · Hidup: 0,0",
+    standard_ref: "SNI 1726:2019 Pasal 7.7.2 hlm. 68 (PDF hlm. 76)",
+    status: swFactorsMatch ? "DEFAULT_SNI" : "OVERRIDE_USER",
+    note: "100% beban mati, 0% beban hidup hunian/kantor tipikal",
+  });
+
+  // 7. Seismik - Koefisien Situs Fa
+  const isFaManual = Boolean(bundle.seismic.raw_inputs.override_site_coefficients) || bundle.seismic.raw_inputs.site_class === "SF";
+  items.push({
+    category: "Seismik",
+    parameter: "Koefisien situs Fa",
+    value: bundle.seismic.raw_inputs.fa !== null ? String(bundle.seismic.raw_inputs.fa) : "—",
+    standard_ref: "SNI 1726:2019 Tabel 6 hlm. 34 (PDF hlm. 42)",
+    status: isFaManual ? "OVERRIDE_USER" : "DEFAULT_SNI",
+    note: bundle.seismic.raw_inputs.site_class === "SF" ? "Wajib evaluasi geoteknik spesifik-situs (Pasal 6.10.1)" : isFaManual ? "Override manual pengguna" : "Interpolasi otomatis Tabel 6",
+  });
+
+  // 8. Seismik - Koefisien Situs Fv
+  const isFvManual = Boolean(bundle.seismic.raw_inputs.override_site_coefficients) || bundle.seismic.raw_inputs.site_class === "SF";
+  items.push({
+    category: "Seismik",
+    parameter: "Koefisien situs Fv",
+    value: bundle.seismic.raw_inputs.fv !== null ? String(bundle.seismic.raw_inputs.fv) : "—",
+    standard_ref: "SNI 1726:2019 Tabel 7 hlm. 34 (PDF hlm. 42)",
+    status: isFvManual ? "OVERRIDE_USER" : "DEFAULT_SNI",
+    note: bundle.seismic.raw_inputs.site_class === "SF" ? "Wajib evaluasi geoteknik spesifik-situs (Pasal 6.10.1)" : isFvManual ? "Override manual pengguna" : "Interpolasi otomatis Tabel 7",
+  });
+
+  // 9. Seismik - Kategori Risiko
+  items.push({
+    category: "Seismik",
+    parameter: "Kategori Risiko Bangunan",
+    value: `Kategori ${bundle.seismic.raw_inputs.risk_category}`,
+    standard_ref: "SNI 1726:2019 Tabel 3 & Tabel 4 hlm. 24–25 (PDF hlm. 32–33)",
+    status: "DEFAULT_SNI",
+    note: "Menentukan faktor keutamaan gempa (Ie)",
+  });
+
+  return items;
+}
+

@@ -6,7 +6,7 @@ import test from "node:test";
 import { inflateRawSync } from "node:zlib";
 import { generateReportDocx } from "../src/lib/report-docx.ts";
 import { REPORT_MASTER_FILE, REPORT_MASTER_SHA256, REPORT_TEMPLATE_MANIFEST } from "../src/lib/report-template-manifest.ts";
-import { createReportSnapshot, createReportWorkspace, isReportSnapshotStale, updateFigure, updateTableCaption, validateReport } from "../src/lib/report.ts";
+import { createReportSnapshot, createReportWorkspace, deriveAssumptionsAndDefaults, isReportSnapshotStale, updateFigure, updateTableCaption, validateReport } from "../src/lib/report.ts";
 import { reviseGeometry } from "../src/lib/projects.ts";
 import { completeProjectBundle } from "./fixtures/complete-project.ts";
 
@@ -146,3 +146,31 @@ test("DOCX berhenti pada handoff pra-analisis tanpa hasil Stage 2 atau bahasa in
   assert.doesNotMatch(document, /Generate #1|\bM[3-7]\b|registry|ENGINEER_APPROVED|source[_ ]hash|debug/i);
   assert.doesNotMatch(document, /Konsep Perancangan Struktur Baja Tahan Gempa/);
 });
+
+test("deriveAssumptionsAndDefaults merekam 9 parameter inti, mendeteksi DEFAULT_SNI dan OVERRIDE_USER", () => {
+  const bundle = completeProjectBundle();
+  const items = deriveAssumptionsAndDefaults(bundle);
+  assert.equal(items.length, 9);
+
+  for (const item of items) {
+    assert.ok(item.category);
+    assert.ok(item.parameter);
+    assert.ok(item.value);
+    assert.ok(item.standard_ref);
+    assert.ok(item.note);
+    assert.ok(item.status === "DEFAULT_SNI" || item.status === "OVERRIDE_USER");
+  }
+
+  // Cek default material beton 2400 kg/m3 pada fixture standar
+  const density = items.find((i) => i.parameter.includes("Berat jenis"));
+  assert.ok(density);
+  assert.equal(density.status, "DEFAULT_SNI");
+
+  // Jika density diubah manual, status berubah menjadi OVERRIDE_USER
+  const modified = structuredClone(bundle);
+  modified.materials.concrete.density.value = 2500;
+  const modItems = deriveAssumptionsAndDefaults(modified);
+  const modDensity = modItems.find((i) => i.parameter.includes("Berat jenis"));
+  assert.equal(modDensity?.status, "OVERRIDE_USER");
+});
+
