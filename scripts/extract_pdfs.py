@@ -12,8 +12,10 @@ except ImportError:
     install('pypdf')
     import pypdf
 
-os.makedirs('docs/sni/extracted', exist_ok=True)
-pdfs = glob.glob('docs/sni/*.pdf')
+sni_dir = sys.argv[1] if len(sys.argv) > 1 else 'docs/sni'
+output_dir = os.path.join(sni_dir, 'extracted')
+os.makedirs(output_dir, exist_ok=True)
+pdfs = glob.glob(os.path.join(sni_dir, '*.pdf'))
 
 for pdf_path in pdfs:
     name = os.path.basename(pdf_path)
@@ -32,7 +34,7 @@ for pdf_path in pdfs:
             text_content += text if text else ""
             
         txt_name = os.path.splitext(name)[0] + ".txt"
-        txt_path = os.path.join('docs/sni/extracted', txt_name)
+        txt_path = os.path.join(output_dir, txt_name)
         
         if extractable:
             with open(txt_path, 'w', encoding='utf-8') as f:
@@ -43,12 +45,3 @@ for pdf_path in pdfs:
             
     except Exception as e:
         print(f"ERROR reading {name}: {e}")
-
-try:
-    with open('.gitignore', 'r', encoding='utf-8') as f:
-        content = f.read()
-    if 'docs/sni/extracted/' not in content:
-        with open('.gitignore', 'a', encoding='utf-8') as f:
-            f.write('\ndocs/sni/extracted/\n')
-except Exception as e:
-    pass
